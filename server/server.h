@@ -30,7 +30,6 @@ typedef enum ClIENT_STATE {
     AWAITING_USERNAME,
     IN_CHAT_LOBBY,       
     IN_CHAT_ROOM,        
-    DISCONNECTING
 } ClIENT_STATE;
 
 
@@ -42,8 +41,8 @@ typedef struct Client {
     int room_index;
     bool in_use;
     char current_msg[MAX_MESSAGE_LEN_TO_SERVER];
-    Client* next_client;
-    Client* prev_client;
+    struct Client* next_client;
+    struct Client* prev_client;
 } Client;
 
 
@@ -52,7 +51,7 @@ typedef struct  Worker_Thread {
     pthread_t id;
     int num_of_clients;
     pthread_mutex_t worker_lock;
-    uint64_t notification_fd;
+    int notification_fd;
     int client_fds[MAX_CLIENTS_PER_THREAD];
     Client clients[MAX_CLIENTS_PER_THREAD];
 } Worker_Thread;
@@ -67,7 +66,8 @@ typedef struct Room {
     pthread_mutex_t room_lock;
 } Room;
 
-
+extern Room SERVER_ROOMS[MAX_ROOMS];
+void log_message(const char *format_str, ...);
 
 
 #endif

@@ -14,7 +14,7 @@ server.o: server.c server.h
 	$(CC) $(CFLAGS) -c server.c -o server.o
 
 chat_message_handler.o: chat_message_handler.c chat_message_handler.h
-    $(CC) $(CFLAGS) -c chat_message_handler.c -o chat_message_handler.o
+	$(CC) $(CFLAGS) -c chat_message_handler.c -o chat_message_handler.o
 
 
 

@@ -7,7 +7,7 @@
 
 
 void print_erro_n_exit(char *msg);
-
+void process_new_client(Worker_Thread *thread_data, int epoll_fd);
 int setupServer(int port_number, int backlog);
 void format_msg (char* buffer, uint8_t error_code, const char* msg);
 bool validate_msg(char *msg, char *return_msg);
@@ -19,7 +19,6 @@ void process_client_message(Client *client, Worker_Thread* thread_data);
 void handle_disconnection(Client *client);
 void handle_client_message(Client *client);
 void setup_new_cleint(Worker_Thread *thread_data, int epoll_fd);
-void log_message(const char *format_str, ...);
 void setup_new_user(Worker_Thread *thread_data, int client_fd);
 void init_server_rooms();
 void handle_connected_clients(Client *client);
@@ -61,7 +60,7 @@ int main() {
 
 void init_server_rooms() {        
     for(int i = 0; i < MAX_ROOMS; i++) {
-        pthread_mutex_init(&SERVER_ROOMS[i].mutex, NULL);
+        pthread_mutex_init(&SERVER_ROOMS[i].room_lock, NULL);
     }
 }
 
@@ -137,7 +136,7 @@ void log_message(const char *format_str, ...) {
 
 
 void *process_client_connections(void *worker){
-    int events_ready; 
+    int event_count; 
     Worker_Thread *thread_data  = (Worker_Thread *)worker;
 
     struct epoll_event event_queue[MAX_CLIENTS_PER_THREAD + 1];
@@ -151,13 +150,13 @@ void *process_client_connections(void *worker){
     register_with_epoll(epoll_fd, thread_data->notification_fd);
 
     while(1) {
-        int event_count = epoll_wait(epoll_fd, event_queue, MAX_CLIENTS_PER_THREAD + 1, -1);
+        event_count = epoll_wait(epoll_fd, event_queue, MAX_CLIENTS_PER_THREAD + 1, -1);
         if(event_count == -1) {
             perror("epoll wait failed");
             continue;
         }
         for(int i = 0; i < event_count; i++) {
-            if(event_queue[i].data.fd == thread_data->notification_fd) {
+            if(event_queue[i].data.fd == (int)thread_data->notification_fd) {
                     process_new_client(thread_data,epoll_fd);
                     continue;
             }
@@ -197,99 +196,12 @@ void process_new_client(Worker_Thread *thread_data, int epoll_fd) {
 }
 
 
-void validate_client_command(Client* client) {
-    char error_msg[MAX_MESSAGE_LEN_FROM_SERVER] = {0};
-    char command_type = client->current_msg[0];
-
-    switch(client->state) {
-        case CONNECTED:
-            if(command_type != CMD_USERNAME) {
-                sprintf(error_msg, "%c Username required first\n%s", 
-                    ERR_INVALID_COMMAND, MSG_TERMINATOR);
-                send(client->client_fd, error_msg, strlen(error_msg), 0);
-            }
-            return false;
-        case IN_LOBBY:
-            if(command_type != CMD_CREATE_ROOM && 
-               command_type != CMD_JOIN_ROOM &&
-               command_type != CMD_LIST_ROOMS) {
-                sprintf(error_msg, "%c Invalid lobby command. Available commands: Create Room, Join Room, List Rooms \n%s",
-                    ERR_INVALID_COMMAND, MSG_TERMINATOR);
-                send(client->client_fd, error_msg, strlen(error_msg), 0);
-            }
-            return false;
-
-        case IN_ROOM:
-            if(command_type != CMD_ROOM_MESSAGE) {
-                sprintf(error_msg, "%c Invalid room command\n%s",
-                    ERR_INVALID_COMMAND, MSG_TERMINATOR);
-                send(client->client_fd, error_msg, strlen(error_msg), 0);
-            }
-            return false;
-    }
-
-    if(client->current_msg[1] != ' ') {
-        sprintf(error_msg, "%c No space between command and content\n%s",
-        ERR_INVALID_COMMAND, MSG_TERMINATOR);
-        send(client->client_fd, error_msg, strlen(error_msg), 0);
-        return false;
-    }
-    return true;
-
-}
-
-
-
-void handle_connected_clients(Client *client){
-    char room_list_msg[MAX_MESSAGE_LEN_FROM_SERVER] = {};
-    bool rooms_avail = false;
-
-    strcpy(client->name,client->current_msg);
-    client->state = IN_LOBBY;
-
-    log_message("MSG Recieved %s\n",client->current_msg);
-    sprintf(room_list_msg, "%c Welcome %s!\nAvailable Rooms:\n", 
-            CMD_ROOM_LIST, client->current_msg);
-
-    for(int i = 0; i < MAX_ROOMS; i++) {
-        if(SERVER_ROOMS[i].in_use == true) {
-            sprintf(room_list_msg + strlen(room_list_msg), "Room %d: %s\n", i, SERVER_ROOMS[i].room_name);
-            rooms_avail = true;
-        }
-    }
-
-    if(!rooms_avail) {
-        strcat(room_list_msg, "No rooms available. Create your own!\r\n");
-    } else {
-        strcat(room_list_msg, "\r\n");
-    }
-
-    send(client->client_fd, room_list_msg, strlen(room_list_msg),0);
-
-}
-
-
-
-
-
-
-
-
-void handle_in_room_clients(Client *client) {
-
-}
-
-
-void handle_in_lobby_clients(Client *client) {
-}
-
-
 
 Client *find_client_by_fd(Worker_Thread *thread_data, int fd) {
     for(int i = 0; i < MAX_CLIENTS_PER_THREAD; i++) {
-        if(thread_data->users[i].client_fd == fd) {
+        if(thread_data->clients[i].client_fd == fd) {
             log_message("FOUND CLIENT\n");
-            return &thread_data->users[i];
+            return &thread_data->clients[i];
         }
     }
     return NULL; 
@@ -384,49 +296,3 @@ void print_erro_n_exit(char *msg) {
     }
     exit(EXIT_FAILURE);
 }
-
-/*
-void format_msg (char* buffer,const char* msg) {
-    snprintf(buffer, MAX_MESSAGE_LEN_FROM_SERVER, "%02X %s\n\n", msg);
-}
-*/
-
-//Will be for parsing, just a stub for now
-bool validate_msg(char *msg, char *return_msg){
-    return true;
-    
-
-    
-    /* Ignore for now, needs to be properly implemented
-    bool msg_valid = true;
-    int msg_len = strlen(msg);
-
-     if (msg_len < 4) {
-        strcpy(return_msg, "Message too short");
-        msg_valid = false;
-    }
-
-    if(msg[0] > 0x16 < msg[0] < 0x00){
-        strcpy(return_msg, "Invalid command");
-        msg_valid = false;
-    }
-    if(msg[1] != ' '){
-        strcpy(return_msg, "Missing space ");
-        msg_valid = false;
-    }
-    
-    if(msg[msg_len -1] != '\n' || msg[msg_len -2] != '\n') {
-        strcpy(return_msg, "Missing end of line characters");
-        msg_valid = false;
-    }
-
-    if(msg_valid == true) {
-        strcpy(return_msg, "OK");
-        return true;
-    }
-    return false;
-    */
-
-
-}
-

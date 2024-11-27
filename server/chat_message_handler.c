@@ -1,16 +1,13 @@
 #include "chat_message_handler.h"
 
 
-void handle_awaiting_username(Client* client);
-void handle_in_chat_lobby(Client* client);
-void handle_in_chat_room(Client* client);
-void send_response_to_client(Client* client, const char* response, size_t length);
-void broadcast_message_to_room(Room* room, const char* message, Client* sender);
-void send_error_message(Client* client, const char* error_msg);
-bool validate_command_state_and_format(Client *client);
-bool check_command_format(Client* client);
-void route_command(Client *client);
-
+void handle_awaiting_username(Client* client, Worker_Thread* thread_context);
+void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context);
+void handle_in_chat_room(Client* client, Worker_Thread* thread_context);
+void broadcast_message_to_room(Client* sender,Worker_Thread* thread_context);
+void route_client_command(Client *client, Worker_Thread* thread_context);
+void send_avail_rooms(Client *client, Worker_Thread* thread_context);
+void create_chat_room(Client *client, Worker_Thread *thread_context);
 
 
 void process_client_message(Client* client, Worker_Thread* thread_context){
@@ -19,14 +16,14 @@ void process_client_message(Client* client, Worker_Thread* thread_context){
     while(1) {
         bytes_recieved = recv(client->client_fd,read_buffer,MAX_MESSAGE_LEN_TO_SERVER, 0);
         if(bytes_recieved == 0) {
-            handle_client_disconnection(client);
+            handle_client_disconnection(client, thread_context);
             return;
         }
         if(bytes_recieved < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return;  
             }
-            handle_client_disconnection(client);
+            handle_client_disconnection(client, thread_context);
             return;
         }
         read_buffer[bytes_recieved] = '\0';
@@ -37,7 +34,7 @@ void process_client_message(Client* client, Worker_Thread* thread_context){
             continue;
         }
         *msg_term = '\0';
-        route_client_command(client);
+        route_client_command(client,thread_context);
             
         memset(client->current_msg, 0, MAX_MESSAGE_LEN_TO_SERVER);
 
@@ -48,75 +45,93 @@ void process_client_message(Client* client, Worker_Thread* thread_context){
 }
 
 
-void send_message_to_client(Client* client, char cmd_type, const char* message) {
+void send_message_to_client(Client* client, char cmd_type, const char* message, Worker_Thread* thread_context) {
     char message_buffer[MAX_MESSAGE_LEN_FROM_SERVER] = {};
-    sprintf(message_buffer, "%c%s%s", cmd_type, message, MSG_TERMINATOR);
+    sprintf(message_buffer, "%c %s%s", cmd_type, message, MSG_TERMINATOR);
     ssize_t bytes_sent = send(client->client_fd, message_buffer, strlen(message_buffer), 0);
     if (bytes_sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-        handle_client_disconnect(client);
+        handle_client_disconnection(client, thread_context);
     }
 }
 
 
-
-
-bool validate_msg_format(Client *client){
+bool validate_msg_format(Client *client, Worker_Thread* thread_context){
+    //Check if message legnth is less than the minimum
    if(strlen(client->current_msg) < 3) {
         send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
-        "Message too short\nCorrect format:[command char][space][message content][MSG_TERMINATOR]\n");
+        "Message too short\nCorrect format:[command char][space][message content][MSG_TERMINATOR]\n", thread_context);
         return false;
    }
-
+    //Check if space is missing
    if(client->current_msg[1] != ' ') {
         send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
-        "Missing space after command.\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n");
+        "Missing space after command.\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n", thread_context);
         return false;
    }
-
+    //Check if command is not valid
     if(client->current_msg[0] < CMD_EXIT || client->current_msg[0] > CMD_ROOM_MESSAGE_SEND) {
         send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
-        "Command not found\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n");
+        "Command not found\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n", thread_context);
+        return false;
+    }
+
+    //Check if content is empty
+    char *content = &client->current_msg[2];
+    while(*content == ' ' && *content != '\0') {
+        content++;
+    }
+
+    if(*content == '\0') {
+        send_message_to_client(client, ERR_MSG_EMPTY_CONTENT,
+        "Content is Empty\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n", thread_context);
         return false;
     }
 
    return true;
 }
 
-
-
-
-void route_client_command(Client *client) {
-    if(!validate_msg_format){
+void route_client_command(Client *client, Worker_Thread* thread_context) {
+    if(!validate_msg_format(client,thread_context)){
         return;
     }
 
-    if(client->current_msg[0] == CMD_EXIT{
-        handle_client_disconnection(client);
+    if(client->current_msg[0] == CMD_EXIT){
+        handle_client_disconnection(client, thread_context);
         return;
     }
 
     switch(client->state) {
         case AWAITING_USERNAME:
-            handle_awaiting_username(client);
+            handle_awaiting_username(client, thread_context);
             break;
         case IN_CHAT_LOBBY:
-            handle_in_chat_lobby(client);
+            handle_in_chat_lobby(client, thread_context);
             break;
         case IN_CHAT_ROOM:
-            handle_in_chat_room(client);
+            handle_in_chat_room(client, thread_context);
             break;
 
     }
 }
 
-    switch(client->state) {
-        case AWAITING_USERNAME:
-            if(command_type != CMD_USERNAME_SUBMIT ) {
-                sprintf(error_msg, "%c Username required first\n%s", 
-                    , MSG_TERMINATOR);
-                send(client->client_fd, error_msg, strlen(error_msg), 0);
-            }
-            return false;
+
+void handle_awaiting_username(Client* client, Worker_Thread* thread_context) {
+
+    if(client->current_msg[0] != CMD_USERNAME_SUBMIT){
+        send_message_to_client(client,ERR_PROTOCOL_INVALID_STATE_CMD, "CMD not correct for client in awaiting username state\n",
+        thread_context);
+        return;
+    }
+
+    strcpy(client->name,&client->current_msg[2]);
+
+    client->state = IN_CHAT_LOBBY;
+    send_avail_rooms(client, thread_context);
+
+}
+
+
+  /*
         case IN_CHAT_LOBBY:
             if(command_type != CMD_ROOM_CREATE_REQUEST && 
                command_type != CMD_ROOM_JOIN_REQUEST &&
@@ -141,35 +156,100 @@ void route_client_command(Client *client) {
     }
     return true;
 
+*/
 
 
-void handle_awaiting_username(Client* client) {
+void handle_client_disconnection(Client *client, Worker_Thread* thread_context) {
+
+}
+void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context) {
     char room_list_msg[MAX_MESSAGE_LEN_FROM_SERVER] = {};
     bool rooms_avail = false;
+    char command = client->current_msg[0];
 
-    strcpy(client->name,client->current_msg);
-    client->state = IN_LOBBY;
-
-    log_message("MSG Recieved %s\n",client->current_msg);
-    sprintf(room_list_msg, "%c Welcome %s!\nAvailable Rooms:\n", 
-            CMD_ROOM_LIST, client->current_msg);
-
-    for(int i = 0; i < MAX_ROOMS; i++) {
-        if(SERVER_ROOMS[i].in_use == true) {
-            sprintf(room_list_msg + strlen(room_list_msg), "Room %d: %s\n", i, SERVER_ROOMS[i].room_name);
-            rooms_avail = true;
-        }
+    switch(command) {
+        case CMD_ROOM_CREATE_REQUEST:
+            create_chat_room(client,thread_context);
+            break;
+        case CMD_ROOM_JOIN_REQUEST:
+            break;
+        case CMD_ROOM_LIST_REQUEST:
+            send_avail_rooms(client, thread_context);
+            break;
+        case CMD_EXIT:
+            handle_client_disconnection(client, thread_context);
+            break;
+        default:
+            send_message_to_client(client, ERR_PROTOCOL_INVALID_STATE_CMD, 
+                "Invalid command for lobby state\n", thread_context);
+            break;
     }
-
-    if(!rooms_avail) {
-        strcat(room_list_msg, "No rooms available. Create your own!\r\n");
-    } else {
-        strcat(room_list_msg, "\r\n");
-    }
-
-    send(client->client_fd, room_list_msg, strlen(room_list_msg),0);
-
-
 
 }
 
+void create_chat_room(Client *client, Worker_Thread *thread_context){
+    char success_msg[MAX_MESSAGE_LEN_FROM_SERVER];
+    bool rooms_avail = false;
+
+    for(int i = 0; i < MAX_ROOMS; i++) {
+        pthread_mutex_lock(&SERVER_ROOMS[i].room_lock);
+        if(SERVER_ROOMS[i].in_use == false) {
+            SERVER_ROOMS[i].in_use = true;
+            SERVER_ROOMS[i].first_client = client;
+            SERVER_ROOMS[i].last_client = client;
+            SERVER_ROOMS[i].num_clients = 1;
+            strcpy(SERVER_ROOMS[i].room_name, &client->current_msg[2]);
+            client->room_index = i;
+            rooms_avail = true;
+            pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
+            break; 
+        }
+        pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
+    }
+
+    if(!rooms_avail) {
+        send_message_to_client(client, ERR_SERVER_ROOM_FULL,
+            "Room creation failed: Maximum number of rooms reached\n", thread_context);
+    } else {
+        client->state = IN_CHAT_ROOM;
+            snprintf(success_msg, sizeof(success_msg), 
+            "Room created successfully: %s\n", &client->current_msg[2]);
+        send_message_to_client(client, CMD_ROOM_CREATE_OK, success_msg, thread_context);
+    }
+}
+
+
+void send_avail_rooms(Client *client, Worker_Thread* thread_context) {
+
+    char room_list_msg[MAX_MESSAGE_LEN_FROM_SERVER] = "=== Available Chat Rooms ===\n\n";
+    bool rooms_avail = false;
+
+    log_message("MSG Recieved %s\n",client->current_msg);
+
+    for(int i = 0; i < MAX_ROOMS; i++) {
+        pthread_mutex_lock(&SERVER_ROOMS[i].room_lock);
+        if(SERVER_ROOMS[i].in_use == true) {
+            log_message("here \n");
+
+            sprintf(room_list_msg + strlen(room_list_msg), "Room %d: %s\n", i, SERVER_ROOMS[i].room_name);
+            rooms_avail = true;
+        }
+        pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
+
+    }
+
+    if(!rooms_avail) {
+        sprintf(room_list_msg + strlen(room_list_msg),"No chat rooms available!\n","Use the create room command to start your own chat room.\n");
+    }
+
+    send_message_to_client(client,CMD_ROOM_LIST_RESPONSE,room_list_msg, thread_context);
+}
+
+
+
+void handle_in_chat_room(Client* client, Worker_Thread* thread_context){
+
+}
+void broadcast_message_to_room(Client* sender,Worker_Thread* thread_context){
+
+}
