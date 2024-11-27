@@ -14,11 +14,10 @@ bool validate_msg(char *msg, char *return_msg);
 void *process_client_connections(void *worker);
 void setup_threads(Worker_Thread worker_threads[]);
 void distribute_client(int client_fd, Worker_Thread workers[]);
-void register_with_epoll(int epoll_fd, int target_fd);
+bool register_with_epoll(int epoll_fd, int target_fd);
 void process_client_message(Client *client, Worker_Thread* thread_data);
 void handle_disconnection(Client *client);
 void handle_client_message(Client *client);
-void setup_new_cleint(Worker_Thread *thread_data, int epoll_fd);
 void setup_new_user(Worker_Thread *thread_data, int client_fd);
 void init_server_rooms();
 void handle_connected_clients(Client *client);
@@ -68,9 +67,11 @@ void init_server_rooms() {
 
 
 void setup_threads(Worker_Thread worker_threads[]){
+
     for(int i = 0; i < MAX_THREADS; i++) {
         worker_threads[i].notification_fd = eventfd(0, EFD_NONBLOCK);
         worker_threads[i].num_of_clients = 0;
+        worker_threads[i].epoll_fd = 0;
         pthread_mutex_init(&worker_threads[i].worker_lock, NULL);
 
         if(worker_threads[i].notification_fd == -1) {
@@ -85,14 +86,17 @@ void setup_threads(Worker_Thread worker_threads[]){
 
 
 
-void register_with_epoll(int epoll_fd, int target_fd) {
+bool register_with_epoll(int epoll_fd, int target_fd) {
     struct epoll_event event_config;
-    event_config.events = EPOLLIN | EPOLLET;
+    event_config.events = EPOLLIN;
     event_config.data.fd = target_fd;
     
     if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, target_fd, &event_config) == -1) {
         perror("Failed to register fd with epoll");
+        return false;
     }
+
+    return true;
 }
 
 
@@ -146,7 +150,7 @@ void *process_client_connections(void *worker){
     if(epoll_fd == -1) {
         print_erro_n_exit("Could not create epoll fd");
     }
-
+    thread_data->epoll_fd =  epoll_fd;
     register_with_epoll(epoll_fd, thread_data->notification_fd);
 
     while(1) {
@@ -160,7 +164,7 @@ void *process_client_connections(void *worker){
                     process_new_client(thread_data,epoll_fd);
                     continue;
             }
-
+            
             Client *user = find_client_by_fd(thread_data,event_queue[i].data.fd);
             process_client_message(user,thread_data);
 
@@ -169,6 +173,8 @@ void *process_client_connections(void *worker){
         }
 
 }
+
+
 
 void process_new_client(Worker_Thread *thread_data, int epoll_fd) {
     char welcome_msg[MAX_MESSAGE_LEN_FROM_SERVER];
@@ -186,13 +192,15 @@ void process_new_client(Worker_Thread *thread_data, int epoll_fd) {
         }
         return;
     }
+
+    if(register_with_epoll(epoll_fd,(int) client_fd) == false) {
+        return;
+    }
     thread_data->num_of_clients++;
 
-    register_with_epoll(epoll_fd,(int) client_fd);
     setup_new_user(thread_data,(int) client_fd);
     log_message("Thread %lu got new client fd: %d\n", (unsigned long)thread_data->id, client_fd);
-
-    send(client_fd,welcome_msg, strlen(welcome_msg),0);
+    send(client_fd,welcome_msg, strlen(welcome_msg),0); 
 }
 
 
@@ -226,16 +234,22 @@ void distribute_client(int client_fd, Worker_Thread workers[]) {
         worker_index = (worker_index + 1) % MAX_THREADS;
         num_attempts++;
         if(num_attempts == MAX_THREADS) {
+            const char* err_msg = "\x2B Sorry, the server is currently at full capacity. Please try again later!\r\n";
+            send(client_fd, err_msg, strlen(err_msg), 0);
             close(client_fd);
-            perror("Connection with a incoming client closed as the threads are full");
+            log_message("Connection rejected: Server at capacity (all threads full)\n");
             return;
         }
     }
 
     if(write(workers[worker_index].notification_fd, &value, sizeof(uint64_t)) == -1) {
-        perror("Failed to notify a worker thread of a new connection:");
+        const char* err_msg = "\x2C Sorry, there was an error connecting to the server. Please try again!\r\n";
+        send(client_fd, err_msg, strlen(err_msg), 0);
+        close(client_fd);
+        log_message("Failed to notify worker thread of new connection: %s\n", strerror(errno));
         return;
     }
+
 
     worker_index = (worker_index + 1) % MAX_THREADS;
 

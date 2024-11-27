@@ -16,7 +16,7 @@
 #include <sys/eventfd.h>
 #include <sys/types.h>
 #include <stdarg.h>
-
+ #include <sys/epoll.h>
 #define MAX_CLIENTS_ROOM 100     // Max clients per room
 #define MAX_ROOMS 100            // Max rooms
 #define MAX_CLIENTS (MAX_CLIENTS_ROOM * MAX_ROOMS)  // Total possible clients
@@ -36,11 +36,11 @@ typedef enum ClIENT_STATE {
 
 typedef struct Client {
     int client_fd;
-    char name[MAX_USERNAME_LEN];
+    char name[MAX_USERNAME_LEN + 1];
     ClIENT_STATE state;
     int room_index;
     bool in_use;
-    char current_msg[MAX_MESSAGE_LEN_TO_SERVER];
+    char current_msg[MAX_MESSAGE_LEN_TO_SERVER * 3];
     struct Client* next_client;
     struct Client* prev_client;
 } Client;
@@ -52,6 +52,7 @@ typedef struct  Worker_Thread {
     int num_of_clients;
     pthread_mutex_t worker_lock;
     int notification_fd;
+    int epoll_fd;
     int client_fds[MAX_CLIENTS_PER_THREAD];
     Client clients[MAX_CLIENTS_PER_THREAD];
 } Worker_Thread;
@@ -60,7 +61,7 @@ typedef struct  Worker_Thread {
 typedef struct Room {
     Client* first_client;
     Client* last_client;
-    char room_name[MAX_ROOM_NAME_LEN];
+    char room_name[MAX_ROOM_NAME_LEN + 1];
     int num_clients;
     bool in_use;
     pthread_mutex_t room_lock;
