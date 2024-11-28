@@ -111,6 +111,7 @@ void setup_new_user(Worker_Thread *thread_data, int client_fd) {
             thread_data->clients[i].in_use = true;
             thread_data->clients[i].state = AWAITING_USERNAME;
             thread_data->clients[i].client_fd = client_fd;
+
             return;
         }
     }
@@ -168,6 +169,7 @@ void *process_client_connections(void *worker){
             Client *user = find_client_by_fd(thread_data,event_queue[i].data.fd);
             process_client_message(user,thread_data);
 
+
         }       
 
         }
@@ -208,6 +210,7 @@ void process_new_client(Worker_Thread *thread_data, int epoll_fd) {
 Client *find_client_by_fd(Worker_Thread *thread_data, int fd) {
     for(int i = 0; i < MAX_CLIENTS_PER_THREAD; i++) {
         if(thread_data->clients[i].client_fd == fd) {
+
             log_message("FOUND CLIENT\n");
             return &thread_data->clients[i];
         }

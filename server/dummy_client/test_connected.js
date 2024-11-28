@@ -1,79 +1,239 @@
 const net = require('net');
+const readline = require('readline');
+const help = `
+Available commands:
+    /list   - List available rooms
+    /create - Create a new room
+    /join   - Join a room
+    /exit   - Exit the chat
+    /help   - Show this help message
 
-const CLIENT_CONFIG = {
+Just type to send a message when in a room
+Once in room these, only exit and help will work
+                    `;
+
+let client_in_room = false;
+const SERVER_CONFIG = {
     host: 'localhost',
     port: 30000
 };
 
-const MAX_CLIENTS = 10016;
-let connectedClients = 0;
-let failedConnections = 0;
-const clients = [];
+const COMMANDS = {
+    EXIT: 0x01,
+    USERNAME: 0x02,
+    CREATE_ROOM: 0x03,
+    LIST_ROOMS: 0x04,
+    JOIN_ROOM: 0x05,
+    SEND_MESSAGE: 0x06,
+};
 
-function setupClient(client, clientId) {
-    client.on('data', () => {});
-    client.on('close', () => connectedClients--);
-    client.on('error', () => failedConnections++);
-}
 
-function createClient(clientId) {
-    const client = new net.Socket();
-    setupClient(client, clientId);
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+const client = new net.Socket();
 
-    client.connect(CLIENT_CONFIG.port, CLIENT_CONFIG.host, () => {
-        connectedClients++;
-        client.write(String.fromCharCode(0x02) + ` User${clientId}\r\n`);
+
+client.connect(SERVER_CONFIG.port, SERVER_CONFIG.host, () => {
+    console.log('Connected to server');
+    rl.setPrompt('> ');
+    rl.prompt();
+
+    rl.on('line', (input)=> {
+        const userInput = input.trim();
+        if(userInput == ''){
+            rl.prompt();
+        }
+        if(userInput.startsWith('/') && !client_in_room) {
+            const command = userInput.slice(1).toLowerCase();
+
+            switch(command) {
+                case('list'):
+                    client.write(`${String.fromCharCode(COMMANDS.LIST_ROOMS)} list\r\n`);
+                    break;
+
+                case('create'):
+                    rl.question("Enter the room name to create:", (room)=> {
+                        client.write(`${String.fromCharCode(COMMANDS.CREATE_ROOM)} ${room}\r\n`);
+                        client_in_room = true;
+                    });
+                    break;    
+
+                case('join'):
+                    rl.question("Enter a room number to join:", (room)=> {
+                        client.write(`${String.fromCharCode(COMMANDS.JOIN_ROOM)} ${room}\r\n`);
+                        client_in_room = true;
+                    });
+                    break;
+
+                case 'exit':
+                    client.write(`${String.fromCharCode(COMMANDS.EXIT)} exit\r\n`);
+                    client.end();
+                    rl.close();
+                    process.exit();
+                    break;
+
+                default:
+                    console.log(help);
+                    break;
+            }
+        } else {
+            client.write(`${String.fromCharCode(COMMANDS.SEND_MESSAGE)} ${userInput}\r\n`);
+        }
+    
+        rl.prompt();
+
+        
+
+
     });
 
-    return client;
-}
 
-async function test() {
-    console.log("Phase 1: Testing maximum connections...");
-    
-    // Try to connect MAX_CLIENTS + 100 to verify limit
-    for (let i = 0; i < MAX_CLIENTS + 100; i++) {
-        clients.push(createClient(i));
-        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay between connections
-    }
+});
 
-    // Wait for 30 seconds to see stable connection count
-    await new Promise(resolve => setTimeout(resolve, 30000));
-    console.log(`
-    After max connection test:
-    Connected Clients: ${connectedClients}
-    Failed Connections: ${failedConnections}
-    `);
 
-    // Disconnect all clients
-    console.log("\nPhase 2: Disconnecting all clients...");
-    clients.forEach(client => client.destroy());
-    await new Promise(resolve => setTimeout(resolve, 5000));
+client.on('data', (data) => {
+    console.log("\n"+ data.toString().slice(1).trim("\r\n") );
+    rl.prompt(true);
+  });
 
-    // Clear clients array
-    clients.length = 0;
-    failedConnections = 0;
+client.on('connect', () => {
+    rl.question('Enter your username: ', (username) => {
+        client.write(`${String.fromCharCode(COMMANDS.USERNAME)} ${username}\r\n`);
+        console.log('\nType /help to see available commands');
+        rl.prompt();
+    });
+});
 
-    // Try to connect MAX_CLIENTS again
-    console.log("\nPhase 3: Testing reconnection of max clients...");
-    for (let i = 0; i < MAX_CLIENTS; i++) {
-        clients.push(createClient(i));
-        await new Promise(resolve => setTimeout(resolve, 10));
-    }
 
-    // Wait for 30 seconds to see stable connection count
-    await new Promise(resolve => setTimeout(resolve, 30000));
-    console.log(`
-    After reconnection test:
-    Connected Clients: ${connectedClients}
-    Failed Connections: ${failedConnections}
-    `);
-}
 
-test();
+
+client.on('close', () => {
+    console.log('\nDisconnected from server');
+    rl.close();
+    process.exit(0);
+});
+
+client.on('error', (err) => {
+    console.error('Connection error:', err.message);
+    process.exit(1);
+});
+
+
 
 process.on('SIGINT', () => {
-    console.log('\nShutting down...');
-    clients.forEach(client => client.destroy());
+    client.end();
+    rl.close();
     process.exit();
 });
+
+
+/*
+
+
+
+
+
+
+
+
+
+const client = new net.Socket();
+
+client.on('data', (data) => {
+    process.stdout.clearLine(0);
+    process.stdout.cursorTo(0);
+    
+    console.log(data.toString().slice(1).replace('\r\n', ''));
+    
+    rl.prompt(true);
+});
+
+client.on('close', () => {
+    console.log('\nDisconnected from server');
+    rl.close();
+    process.exit(0);
+});
+
+client.on('error', (err) => {
+    console.error('Connection error:', err.message);
+    process.exit(1);
+});
+
+client.connect(CLIENT_CONFIG.port, CLIENT_CONFIG.host, () => {
+    console.log('Connected to server');
+
+    rl.setPrompt('> ');
+    rl.prompt();
+
+    rl.on('line', (line) => {
+        if (line.trim() === '') {
+            rl.prompt();
+            return;
+        }
+
+        if (line.startsWith('/')) {
+            const command = line.slice(1).toLowerCase();
+            
+            switch(command) {
+                case 'list':
+                    client.write(`${String.fromCharCode(COMMANDS.LIST_ROOMS)} list\r\n`);
+                    break;
+                    
+                case 'create':
+                    rl.question('Enter room name: ', (name) => {
+                        client.write(`${String.fromCharCode(COMMANDS.CREATE_ROOM)} ${name}\r\n`);
+                        rl.prompt();
+                    });
+                    return;
+                    
+                case 'join':
+                    rl.question('Enter room number: ', (room) => {
+                        client.write(`${String.fromCharCode(COMMANDS.JOIN_ROOM)} ${room}\r\n`);
+                        rl.prompt();
+                    });
+                    return;
+                    
+                case 'exit':
+                    client.write(`${String.fromCharCode(COMMANDS.EXIT)} exit\r\n`);
+                    client.end();
+                    rl.close();
+                    return;
+                    
+                case 'help':
+                    console.log(`
+Available commands:
+/list   - List available rooms
+/create - Create a new room
+/join   - Join a room
+/exit   - Exit the chat
+/help   - Show this help message
+
+Just type to send a message when in a room
+                    `);
+                    break;
+                    
+                default:
+                    console.log('Unknown command. Type /help for available commands');
+            }
+        } else {
+
+            client.write(`${String.fromCharCode(COMMANDS.SEND_MESSAGE)} ${line}\r\n`);
+        }
+        
+        rl.prompt();
+    });
+});
+
+
+
+client.on('connect', () => {
+    rl.question('Enter your username: ', (username) => {
+        client.write(`${String.fromCharCode(COMMANDS.USERNAME)} ${username}\r\n`);
+        console.log('\nType /help to see available commands');
+        rl.prompt();
+    });
+});
+
+**/

@@ -23,6 +23,7 @@
                                 
 #define MAX_CLIENTS_PER_THREAD 32  // How many client does each thread handles
 
+
 // MAX THREADS NEEDED
 #define MAX_THREADS ((MAX_CLIENTS + MAX_CLIENTS_PER_THREAD -1) / MAX_CLIENTS_PER_THREAD)
         
@@ -41,8 +42,6 @@ typedef struct Client {
     int room_index;
     bool in_use;
     char current_msg[MAX_MESSAGE_LEN_TO_SERVER * 3];
-    struct Client* next_client;
-    struct Client* prev_client;
 } Client;
 
 
@@ -59,8 +58,7 @@ typedef struct  Worker_Thread {
 
 
 typedef struct Room {
-    Client* first_client;
-    Client* last_client;
+    struct Client* clients[MAX_CLIENTS_ROOM];
     char room_name[MAX_ROOM_NAME_LEN + 1];
     int num_clients;
     bool in_use;

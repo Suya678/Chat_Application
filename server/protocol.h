@@ -21,8 +21,7 @@
 #define CMD_ROOM_CREATE_FAIL        0x19  // Server reports room creation failed
 #define CMD_ROOM_LIST_RESPONSE      0x1A  // Server sending room list
 #define CMD_ROOM_JOIN_OK            0x1B  // Server confirms room join
-#define CMD_ROOM_JOIN_FAIL          0x1C  // Server reports room join failed
-
+#define CMD_ROOM_MSG                 0x1C  
 
 
 // Error Codes
