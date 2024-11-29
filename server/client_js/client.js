@@ -46,7 +46,7 @@ client.connect(SERVER_CONFIG.port, SERVER_CONFIG.host, () => {
         if(userInput == ''){
             rl.prompt();
         }
-        if(userInput.startsWith('/') && !client_in_room) {
+        if(userInput.startsWith('/')) {
             const command = userInput.slice(1).toLowerCase();
 
             switch(command) {
@@ -64,7 +64,6 @@ client.connect(SERVER_CONFIG.port, SERVER_CONFIG.host, () => {
                 case('join'):
                     rl.question("Enter a room number to join:", (room)=> {
                         client.write(`${String.fromCharCode(COMMANDS.JOIN_ROOM)} ${room}\r\n`);
-                        client_in_room = true;
                     });
                     break;
 
@@ -130,7 +129,6 @@ process.on('SIGINT', () => {
 });
 
 
-/*
 
 
 
@@ -139,102 +137,3 @@ process.on('SIGINT', () => {
 
 
 
-
-const client = new net.Socket();
-
-client.on('data', (data) => {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-    
-    console.log(data.toString().slice(1).replace('\r\n', ''));
-    
-    rl.prompt(true);
-});
-
-client.on('close', () => {
-    console.log('\nDisconnected from server');
-    rl.close();
-    process.exit(0);
-});
-
-client.on('error', (err) => {
-    console.error('Connection error:', err.message);
-    process.exit(1);
-});
-
-client.connect(CLIENT_CONFIG.port, CLIENT_CONFIG.host, () => {
-    console.log('Connected to server');
-
-    rl.setPrompt('> ');
-    rl.prompt();
-
-    rl.on('line', (line) => {
-        if (line.trim() === '') {
-            rl.prompt();
-            return;
-        }
-
-        if (line.startsWith('/')) {
-            const command = line.slice(1).toLowerCase();
-            
-            switch(command) {
-                case 'list':
-                    client.write(`${String.fromCharCode(COMMANDS.LIST_ROOMS)} list\r\n`);
-                    break;
-                    
-                case 'create':
-                    rl.question('Enter room name: ', (name) => {
-                        client.write(`${String.fromCharCode(COMMANDS.CREATE_ROOM)} ${name}\r\n`);
-                        rl.prompt();
-                    });
-                    return;
-                    
-                case 'join':
-                    rl.question('Enter room number: ', (room) => {
-                        client.write(`${String.fromCharCode(COMMANDS.JOIN_ROOM)} ${room}\r\n`);
-                        rl.prompt();
-                    });
-                    return;
-                    
-                case 'exit':
-                    client.write(`${String.fromCharCode(COMMANDS.EXIT)} exit\r\n`);
-                    client.end();
-                    rl.close();
-                    return;
-                    
-                case 'help':
-                    console.log(`
-Available commands:
-/list   - List available rooms
-/create - Create a new room
-/join   - Join a room
-/exit   - Exit the chat
-/help   - Show this help message
-
-Just type to send a message when in a room
-                    `);
-                    break;
-                    
-                default:
-                    console.log('Unknown command. Type /help for available commands');
-            }
-        } else {
-
-            client.write(`${String.fromCharCode(COMMANDS.SEND_MESSAGE)} ${line}\r\n`);
-        }
-        
-        rl.prompt();
-    });
-});
-
-
-
-client.on('connect', () => {
-    rl.question('Enter your username: ', (username) => {
-        client.write(`${String.fromCharCode(COMMANDS.USERNAME)} ${username}\r\n`);
-        console.log('\nType /help to see available commands');
-        rl.prompt();
-    });
-});
-
-**/

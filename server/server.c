@@ -1,127 +1,27 @@
-#include "server.h"
-#include "protocol.h"
- #include <sys/epoll.h>
-#define PORT_NUMBER 30000
-#define BACKLOG 20
+//Local
+#include "server.h"     // For our own declarations and constants
+
+//Library
+#include <stdio.h>      // For printf, fprintf, perror, fflush, stdout, stderr
+#include <stdlib.h>     // For exit, EXIT_FAILURE
+#include <string.h>     // For memset
+#include <stdarg.h>     // For va_list, va_start, va_end
+#include <errno.h>      // For errno
+#include <unistd.h>     // For close
+#include <netinet/in.h> // For sockaddr_in, AF_INET, INADDR_ANY, htons
 
 
 
-void print_erro_n_exit(char *msg);
-void process_new_client(Worker_Thread *thread_data, int epoll_fd);
-int setupServer(int port_number, int backlog);
-void format_msg (char* buffer, uint8_t error_code, const char* msg);
-bool validate_msg(char *msg, char *return_msg);
-void *process_client_connections(void *worker);
-void setup_threads(Worker_Thread worker_threads[]);
-void distribute_client(int client_fd, Worker_Thread workers[]);
-bool register_with_epoll(int epoll_fd, int target_fd);
-void process_client_message(Client *client, Worker_Thread* thread_data);
-void handle_disconnection(Client *client);
-void handle_client_message(Client *client);
-void setup_new_user(Worker_Thread *thread_data, int client_fd);
-void init_server_rooms();
-void handle_connected_clients(Client *client);
-void handle_in_room_clients(Client *client);
-void handle_in_lobby_clients(Client *client);
-
-
+// Will be manipulated by other files
 Room SERVER_ROOMS[MAX_ROOMS] = {};
-
-Client *find_client_by_fd(Worker_Thread *thread_data, int fd);
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-int main() {
-    int server_listen_fd, client_fd;
-    Worker_Thread worker_threads[MAX_THREADS];
-    init_server_rooms();
-    setup_threads(worker_threads);
-    
-    server_listen_fd = setupServer(PORT_NUMBER, BACKLOG);
-    log_message("Wating for connection on Port %d \n", PORT_NUMBER);   
-
-    while(1) {
-
-       client_fd = accept4(server_listen_fd, NULL, NULL, SOCK_NONBLOCK);
-        if(client_fd == -1) {
-            if(errno == EAGAIN || errno == EWOULDBLOCK) {
-                continue;  
-            }
-            perror("accept failed");
-            continue;
-        }
-        distribute_client(client_fd, worker_threads); 
-    }
-
-    close(server_listen_fd);
-    return 0;
-}
-
-
-void init_server_rooms() {        
-    for(int i = 0; i < MAX_ROOMS; i++) {
-        pthread_mutex_init(&SERVER_ROOMS[i].room_lock, NULL);
-    }
-}
-
-
-
-
-void setup_threads(Worker_Thread worker_threads[]){
-
-    for(int i = 0; i < MAX_THREADS; i++) {
-        worker_threads[i].notification_fd = eventfd(0, EFD_NONBLOCK);
-        worker_threads[i].num_of_clients = 0;
-        worker_threads[i].epoll_fd = 0;
-        pthread_mutex_init(&worker_threads[i].worker_lock, NULL);
-
-        if(worker_threads[i].notification_fd == -1) {
-            print_erro_n_exit("Could not create eventfd");
-        }
-        if(pthread_create(&worker_threads[i].id, NULL, process_client_connections,&worker_threads[i]) != 0) {
-             print_erro_n_exit("pthread_create failed");
-        }
-    }
-
-}
-
-
-
-bool register_with_epoll(int epoll_fd, int target_fd) {
-    struct epoll_event event_config;
-    event_config.events = EPOLLIN;
-    event_config.data.fd = target_fd;
-    
-    if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, target_fd, &event_config) == -1) {
-        perror("Failed to register fd with epoll");
-        return false;
-    }
-
-    return true;
-}
-
-
-
-
-
-
-void setup_new_user(Worker_Thread *thread_data, int client_fd) {
-    for(int i = 0; i< MAX_CLIENTS_PER_THREAD;i++) {
-        if(thread_data->clients[i].in_use == false) {
-            memset(&thread_data->clients[i],0, sizeof(Client));
-            thread_data->clients[i].in_use = true;
-            thread_data->clients[i].state = AWAITING_USERNAME;
-            thread_data->clients[i].client_fd = client_fd;
-
-            return;
-        }
-    }
-    log_message("Could not find an empty client struct to add the new connection to");
-}
-
-
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
- * Variadic wrapper around printf  for thread safety
+ * @brief Variadic wrapper around printf for thread-safe 
+ *
+ * @param format_str format string to be written to standard output. Can contain
+ *                  format specifiers which will be replaced by values from additional arguments.
+ * @param ... additional values to replace format specifiers in format_str
  */
 void log_message(const char *format_str, ...) {
     va_list args;
@@ -138,145 +38,35 @@ void log_message(const char *format_str, ...) {
 
 
 
-
-
-void *process_client_connections(void *worker){
-    int event_count; 
-    Worker_Thread *thread_data  = (Worker_Thread *)worker;
-
-    struct epoll_event event_queue[MAX_CLIENTS_PER_THREAD + 1];
-
-    int epoll_fd = epoll_create1(EPOLL_CLOEXEC);    
-
-    if(epoll_fd == -1) {
-        print_erro_n_exit("Could not create epoll fd");
-    }
-    thread_data->epoll_fd =  epoll_fd;
-    register_with_epoll(epoll_fd, thread_data->notification_fd);
-
-    while(1) {
-        event_count = epoll_wait(epoll_fd, event_queue, MAX_CLIENTS_PER_THREAD + 1, -1);
-        if(event_count == -1) {
-            perror("epoll wait failed");
-            continue;
-        }
-        for(int i = 0; i < event_count; i++) {
-            if(event_queue[i].data.fd == (int)thread_data->notification_fd) {
-                    process_new_client(thread_data,epoll_fd);
-                    continue;
-            }
-            
-            Client *user = find_client_by_fd(thread_data,event_queue[i].data.fd);
-            process_client_message(user,thread_data);
-
-
-        }       
-
-        }
-
-}
-
-
-
-void process_new_client(Worker_Thread *thread_data, int epoll_fd) {
-    char welcome_msg[MAX_MESSAGE_LEN_FROM_SERVER];
-    sprintf(welcome_msg, "%c%s", CMD_WELCOME_REQUEST, 
-    "WELCOME TO THE SERVER: "
-    "THIS IS A FAMILY FRIENDLY SPACE\n"
-    "NO CURSING "
-    "OR YOU WILL BE SPANKED\n"
-    "Please enter Your USER NAME\n\r\n");
-
-    uint64_t client_fd;
-    if(read(thread_data->notification_fd, &client_fd, sizeof(uint64_t)) == -1) {
-        if(errno != EAGAIN) {
-            perror("Failed to read from eventfd");
-        }
-        return;
-    }
-
-    if(register_with_epoll(epoll_fd,(int) client_fd) == false) {
-        return;
-    }
-    thread_data->num_of_clients++;
-
-    setup_new_user(thread_data,(int) client_fd);
-    log_message("Thread %lu got new client fd: %d\n", (unsigned long)thread_data->id, client_fd);
-    send(client_fd,welcome_msg, strlen(welcome_msg),0); 
-}
-
-
-
-Client *find_client_by_fd(Worker_Thread *thread_data, int fd) {
-    for(int i = 0; i < MAX_CLIENTS_PER_THREAD; i++) {
-        if(thread_data->clients[i].client_fd == fd) {
-
-            log_message("FOUND CLIENT\n");
-            return &thread_data->clients[i];
-        }
-    }
-    return NULL; 
-}
-
-
-
-
-
-
-
 /**
- * Distrubtes incoming clients to worker threads via event_fd
+ * @brief Initializes the server rooms by clearing the room data and setting up mutexes.
+ * 
+ * @note This function will exit the program if any room mutex initialization fails
  */
-void distribute_client(int client_fd, Worker_Thread workers[]) {
-    static int worker_index = 0;
-    uint64_t value = (uint64_t) client_fd;
-
-    int num_attempts = 0;
-
-    while(workers[worker_index].num_of_clients >= MAX_CLIENTS_PER_THREAD) {
-        worker_index = (worker_index + 1) % MAX_THREADS;
-        num_attempts++;
-        if(num_attempts == MAX_THREADS) {
-            const char* err_msg = "\x2B Sorry, the server is currently at full capacity. Please try again later!\r\n";
-            send(client_fd, err_msg, strlen(err_msg), 0);
-            close(client_fd);
-            log_message("Connection rejected: Server at capacity (all threads full)\n");
-            return;
+void init_server_rooms() {
+    memset(&SERVER_ROOMS, 0, sizeof(Room) * MAX_ROOMS);     
+    for(int i = 0; i < MAX_ROOMS; i++) {
+        if(pthread_mutex_init(&SERVER_ROOMS[i].room_lock, NULL) != 0) {
+            print_erro_n_exit("Failed to initialize mutex for a server room in init_server_room");
         }
     }
-
-    if(write(workers[worker_index].notification_fd, &value, sizeof(uint64_t)) == -1) {
-        const char* err_msg = "\x2C Sorry, there was an error connecting to the server. Please try again!\r\n";
-        send(client_fd, err_msg, strlen(err_msg), 0);
-        close(client_fd);
-        log_message("Failed to notify worker thread of new connection: %s\n", strerror(errno));
-        return;
-    }
-
-
-    worker_index = (worker_index + 1) % MAX_THREADS;
-
 }
 
 
-
-
-
-
-
-
-
-
-
 /**
- * Sets up the server with the provided port number and backlog.
+ * @brief Initializes a server socket, binds it to the specified port, and stes it up to listen for incoming connections
+ * 
  * @param port_number The port number to be used for the server
  * @param backlog The maximum number of clients that can be held up in the queue
- * @return The server socket file descriptor on success, on failure, this function exits the process
+ * 
+ * @return int A file descriptor for the server socket, or -1 on failure.
+ * 
+ * @note ON failure during the socket creation, binding or listening system calls, this function will print an error and
+ *      exit.
  */
-int setupServer(int port_number, int backlog){
+int setup_server(int port_number, int backlog){
     int server_fd;
-
+    int value = 1; 
     struct sockaddr_in server_address = {
         .sin_family = AF_INET,
         .sin_port = htons(port_number),
@@ -287,7 +77,10 @@ int setupServer(int port_number, int backlog){
     if(server_fd == -1) {
         print_erro_n_exit("Socket creation failed");
     }
-   
+    
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR,&value, sizeof(value)) == -1){
+        print_erro_n_exit("setsockopt failed");
+    }
     if(bind(server_fd, (struct sockaddr *) &server_address, sizeof(server_address)) == -1) {
         print_erro_n_exit("Bind failed");
     }
@@ -300,9 +93,8 @@ int setupServer(int port_number, int backlog){
 }
 
 
-
 /** 
-* Prints an error message and exits the program
+* @brief Prints an error message and exits the program
 * @param char *msg msg to be printed before exiting
 */
 void print_erro_n_exit(char *msg) {

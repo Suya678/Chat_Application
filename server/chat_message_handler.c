@@ -1,15 +1,33 @@
-#include "chat_message_handler.h"
+
+// Local 
+#include "chat_message_handler.h"   // For our own declarations and constants
+#include "protocol.h"               // For command types, message length constants
+
+// Library
+#include <stdio.h>      // For sprintf, snprintf, perror
+#include <string.h>     // For strstr, strcpy, strlen, memset
+#include <stdlib.h>     // For atoi
+#include <ctype.h>      // For isdigit
+#include <errno.h>      // For errno, EAGAIN, EWOULDBLOCK
+#include <stdbool.h>    // For bool type
+#include <unistd.h>     // For close
+#include <sys/socket.h> // For recv, send
+#include <pthread.h>    // For pthread_mutex_lock/unlock
+#include <sys/epoll.h>  // For epoll_ctl
 #include <ctype.h>
 
-void handle_awaiting_username(Client* client, Worker_Thread* thread_context);
-void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context);
-void handle_in_chat_room(Client* client, Worker_Thread* thread_context);
-void broadcast_message_to_room(Client* sender,Worker_Thread* thread_context);
-void route_client_command(Client *client, Worker_Thread* thread_context);
-void send_avail_rooms(Client *client, Worker_Thread* thread_context);
-void create_chat_room(Client *client, Worker_Thread *thread_context);
-void join_chat_room(Client *client, Worker_Thread *thread_context);
-void cleanup_client(Client *client, Worker_Thread* thread_context);
+static void send_message_to_client(Client* client, char cmd_type, const char* message);
+static void handle_client_disconnection(Client* client, Worker_Thread *thread_context);
+static void handle_awaiting_username(Client* client, Worker_Thread* thread_context);
+static void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context);
+static void handle_in_chat_room(Client* client, Worker_Thread* thread_context);
+static void broadcast_message_to_room(Client* sender,Worker_Thread* thread_context);
+static void route_client_command(Client *client, Worker_Thread* thread_context);
+static void send_avail_rooms(Client *client, Worker_Thread* thread_context);
+static void create_chat_room(Client *client, Worker_Thread *thread_context);
+static void join_chat_room(Client *client, Worker_Thread *thread_context);
+static void cleanup_client(Client *client, Worker_Thread* thread_context);
+
 
 void process_client_message(Client* client, Worker_Thread* thread_context){
     char read_buffer[MAX_MESSAGE_LEN_TO_SERVER + 1] = {};
@@ -50,15 +68,14 @@ void process_client_message(Client* client, Worker_Thread* thread_context){
 }
 
 
-
-
-
-
 void send_message_to_client(Client* client, char cmd_type, const char* message) {
     char message_buffer[MAX_MESSAGE_LEN_FROM_SERVER] = {};
     sprintf(message_buffer, "%c %s%s", cmd_type, message, MSG_TERMINATOR);
     send(client->client_fd, message_buffer, strlen(message_buffer), 0);
 }
+
+
+
 
 
 bool validate_msg_format(Client *client, Worker_Thread* thread_context){
@@ -75,8 +92,6 @@ bool validate_msg_format(Client *client, Worker_Thread* thread_context){
         return false;
    }
 
-
-
     //Check if command is not valid
     if(client->current_msg[0] < CMD_EXIT || client->current_msg[0] > CMD_ROOM_MESSAGE_SEND) {
         send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
@@ -84,13 +99,11 @@ bool validate_msg_format(Client *client, Worker_Thread* thread_context){
         return false;
     }
 
-
     //Check if content is empty
     char *content = &client->current_msg[2];
     while(*content == ' ' && *content != '\0') {
         content++;
     }
-
     if(*content == '\0') {
         send_message_to_client(client, ERR_MSG_EMPTY_CONTENT,
         "Content is Empty\nCorrect format: [command char][space][message content][MSG_TERMINATOR]\n");
@@ -99,6 +112,7 @@ bool validate_msg_format(Client *client, Worker_Thread* thread_context){
 
    return true;
 }
+
 
 void route_client_command(Client *client, Worker_Thread* thread_context) {
     if(!validate_msg_format(client,thread_context)){
@@ -109,8 +123,8 @@ void route_client_command(Client *client, Worker_Thread* thread_context) {
         handle_client_disconnection(client, thread_context);
         return;
     }
-
-    switch(client->state) {
+    switch
+    (client->state) {
         case AWAITING_USERNAME:
             handle_awaiting_username(client, thread_context);
             break;
@@ -120,7 +134,6 @@ void route_client_command(Client *client, Worker_Thread* thread_context) {
         case IN_CHAT_ROOM:
             handle_in_chat_room(client, thread_context);
             break;
-
     }
 }
 
@@ -132,7 +145,6 @@ void handle_awaiting_username(Client* client, Worker_Thread* thread_context) {
     }
 
     strcpy(client->name,&client->current_msg[2]);
-
     client->state = IN_CHAT_LOBBY;
     send_avail_rooms(client, thread_context);
 
@@ -167,9 +179,8 @@ void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context) {
 }
 
 int parse_room_number(Client *client) {
-
- char *room_index = &client->current_msg[2];
-
+    char *room_index = &client->current_msg[2];
+    
     if(!isdigit(*room_index)) {
         return -1;
     }
@@ -179,9 +190,7 @@ int parse_room_number(Client *client) {
             return -1;
         }  
     }
-
     return atoi(room_index);
-
 }
 
 
@@ -253,6 +262,7 @@ void join_chat_room(Client* client, Worker_Thread* thread_context) {
             send_message_to_client(client, CMD_ROOM_JOIN_OK, 
             "Successfully joined room\n");
             client->state = IN_CHAT_ROOM;
+            client->room_index = room_index;
             break;
         }
     }
@@ -306,7 +316,6 @@ void send_avail_rooms(Client *client, Worker_Thread* thread_context) {
             rooms_avail = true;
         }
         pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
-
     }
 
     if(!rooms_avail) {
@@ -339,7 +348,14 @@ void handle_in_chat_room(Client* client, Worker_Thread* thread_context){
     }
     pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);
 
-  
-
 
 }
+
+
+
+
+
+
+
+
+
