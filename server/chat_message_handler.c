@@ -21,7 +21,6 @@ static void handle_client_disconnection(Client* client, Worker_Thread *thread_co
 static void handle_awaiting_username(Client* client, Worker_Thread* thread_context);
 static void handle_in_chat_lobby(Client* client, Worker_Thread* thread_context);
 static void handle_in_chat_room(Client* client, Worker_Thread* thread_context);
-static void broadcast_message_to_room(Client* sender,Worker_Thread* thread_context);
 static void route_client_command(Client *client, Worker_Thread* thread_context);
 static void send_avail_rooms(Client *client, Worker_Thread* thread_context);
 static void create_chat_room(Client *client, Worker_Thread *thread_context);
@@ -54,7 +53,6 @@ void process_client_message(Client* client, Worker_Thread* thread_context){
     while(msg_term !=NULL){
         *msg_term = '\0';
         strcat(client->current_msg,temp);
-
         route_client_command(client,thread_context);
         memset(client->current_msg, 0, MAX_MESSAGE_LEN_TO_SERVER * 3);
         temp = msg_term + 2;
@@ -72,6 +70,8 @@ void send_message_to_client(Client* client, char cmd_type, const char* message) 
     char message_buffer[MAX_MESSAGE_LEN_FROM_SERVER] = {};
     sprintf(message_buffer, "%c %s%s", cmd_type, message, MSG_TERMINATOR);
     send(client->client_fd, message_buffer, strlen(message_buffer), 0);
+    log_message(message_buffer);
+
 }
 
 
@@ -206,19 +206,23 @@ void cleanup_client(Client *client, Worker_Thread* thread_context){
 //Some repetition needs to be refactored
 void handle_client_disconnection(Client *client, Worker_Thread* thread_context) {
     ClIENT_STATE state= client->state;
-
     if(state == AWAITING_USERNAME || state == IN_CHAT_LOBBY) {
         cleanup_client(client, thread_context);
         return;
     }
     
-    //Clenup room and client
+    char client_left_msg[MAX_MESSAGE_LEN_FROM_SERVER];
+    sprintf(client_left_msg, "%s left the room\n", client->name);
+        //Clenup room and client
+    
     int room_index = client->room_index;
     pthread_mutex_lock(&SERVER_ROOMS[room_index].room_lock);
     for(int i = 0; i < MAX_CLIENTS_ROOM; i++) {
         if(SERVER_ROOMS[room_index].clients[i] == client) {
             SERVER_ROOMS[room_index].clients[i] = NULL;
             SERVER_ROOMS[room_index].num_clients--;
+        } else if(SERVER_ROOMS[room_index].clients[i] != NULL) {
+            send_message_to_client(SERVER_ROOMS[room_index].clients[i], CMD_ROOM_MSG, client_left_msg);
         }
     }
 
@@ -233,7 +237,10 @@ void handle_client_disconnection(Client *client, Worker_Thread* thread_context) 
 
 
 void join_chat_room(Client* client, Worker_Thread* thread_context) {
+    char client_room_join_msg[MAX_MESSAGE_LEN_FROM_SERVER];
+    sprintf(client_room_join_msg, "%s has entered the room\n", client->name);
     int room_index = parse_room_number(client);
+    bool space_found = false;
     if(room_index == -1) {
         send_message_to_client(client, ERR_ROOM_NOT_FOUND, 
             "Invalid room number format. Must be a number between 0-99\n");
@@ -256,14 +263,16 @@ void join_chat_room(Client* client, Worker_Thread* thread_context) {
     }
 
     for(int i = 0; i < MAX_CLIENTS_ROOM; i++) {
-        if(SERVER_ROOMS[room_index].clients[i] == NULL) {
+        if(SERVER_ROOMS[room_index].clients[i] == NULL && !space_found) {
             SERVER_ROOMS[room_index].clients[i] = client;
             SERVER_ROOMS[room_index].num_clients++;
             send_message_to_client(client, CMD_ROOM_JOIN_OK, 
             "Successfully joined room\n");
             client->state = IN_CHAT_ROOM;
             client->room_index = room_index;
-            break;
+            space_found = true;
+        } else if(SERVER_ROOMS[room_index].clients[i] != NULL){
+            send_message_to_client(SERVER_ROOMS[room_index].clients[i], CMD_ROOM_MSG, client_room_join_msg);
         }
     }
     pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);
@@ -273,6 +282,7 @@ void join_chat_room(Client* client, Worker_Thread* thread_context) {
 
 void create_chat_room(Client *client, Worker_Thread *thread_context){
     char success_msg[MAX_MESSAGE_LEN_FROM_SERVER];
+
     bool rooms_avail = false;
 
     for(int i = 0; i < MAX_ROOMS; i++) {
