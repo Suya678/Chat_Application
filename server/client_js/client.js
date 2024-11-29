@@ -24,7 +24,8 @@ const COMMANDS = {
     CREATE_ROOM: 0x03,
     LIST_ROOMS: 0x04,
     JOIN_ROOM: 0x05,
-    SEND_MESSAGE: 0x06,
+    LEAVE_ROOM: 0x06,
+    SEND_MESSAGE: 0x07,
 };
 
 
@@ -57,7 +58,6 @@ client.connect(SERVER_CONFIG.port, SERVER_CONFIG.host, () => {
                 case('create'):
                     rl.question("Enter the room name to create:", (room)=> {
                         client.write(`${String.fromCharCode(COMMANDS.CREATE_ROOM)} ${room}\r\n`);
-                        client_in_room = true;
                     });
                     break;    
 
@@ -73,7 +73,9 @@ client.connect(SERVER_CONFIG.port, SERVER_CONFIG.host, () => {
                     rl.close();
                     process.exit();
                     break;
-
+                case 'leave':
+                    client.write(`${String.fromCharCode(COMMANDS.LEAVE_ROOM)} l\r\n`);
+                    break;
                 default:
                     console.log(help);
                     break;

@@ -14,6 +14,7 @@
 #include <stdint.h>     // For uint64_t
 
 
+
 /**
  * @brief Initializes and creates worker threads for processing client connections.
  *
@@ -53,33 +54,33 @@ void setup_threads(Worker_Thread worker_threads[]){
  * @param workers array of worker threads to distribute clients across
  */
 void distribute_client(int client_fd, Worker_Thread workers[]) {
-    
-    //Maintains the next worker to assing client to in the round robin
+    const char* capacity_err_msg =      "\x2B Sorry, the server is currently at full capacity. Please try again later!\r\n";
+    const char* connection_error_msg =  "\x2C Sorry, there was an error connecting to the server. Please try again!\r\n";
+
+    // Maintains the next worker to assing client to in the round robin
     static int worker_index = 0;
 
 
-    //Even though client_fd is an int, it needs to be converted for compatability wiht event_fd
-    uint64_t value = (uint64_t) client_fd;
+    // Even though client_fd is an int, it needs to be converted for compatability wiht event_fd
+    uint64_t client_fd_as_uint64 = (uint64_t) client_fd;
 
     int num_attempts = 0;
 
-    //Finds a worker thread not at capacity,otherwise reject
+    // Finds a worker thread not at capacity,otherwise reject
     while(workers[worker_index].num_of_clients >= MAX_CLIENTS_PER_THREAD) {
         worker_index = (worker_index + 1) % MAX_THREADS;
         num_attempts++;
         if(num_attempts == MAX_THREADS) {
-            const char* err_msg = "\x2B Sorry, the server is currently at full capacity. Please try again later!\r\n";
-            send(client_fd, err_msg, strlen(err_msg), 0);
+            send(client_fd, capacity_err_msg, strlen(capacity_err_msg), 0);
             close(client_fd);
             log_message("Connection rejected: Server at capacity (all threads full)\n");
             return;
         }
     }
-    
+
     // Notify chosen worker thread of new client using eventfd
-    if(write(workers[worker_index].notification_fd, &value, sizeof(uint64_t)) == -1) {
-        const char* err_msg = "\x2C Sorry, there was an error connecting to the server. Please try again!\r\n";
-        send(client_fd, err_msg, strlen(err_msg), 0);
+    if(write(workers[worker_index].notification_fd, &client_fd_as_uint64, sizeof(uint64_t)) == -1) {
+        send(client_fd, connection_error_msg, strlen(connection_error_msg), 0);
         close(client_fd);
         log_message("Failed to notify worker thread of new connection: %s\n", strerror(errno));
         return;

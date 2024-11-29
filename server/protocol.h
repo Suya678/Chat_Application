@@ -9,7 +9,9 @@
 #define CMD_ROOM_CREATE_REQUEST         0x03  // Client requesting to create a room
 #define CMD_ROOM_LIST_REQUEST           0x04  // Client requesting list of rooms
 #define CMD_ROOM_JOIN_REQUEST           0x05  // Client requesting to join a room
-#define CMD_ROOM_MESSAGE_SEND           0x06  // Client sending a message to room
+#define CMD_LEAVE_ROOM                  0x06
+#define CMD_ROOM_MESSAGE_SEND           0x07  // Client sending a message to room
+
 
 
 // Server to Client Commands
@@ -19,7 +21,7 @@
 #define CMD_ROOM_LIST_RESPONSE          0x1A  // Server sending room list
 #define CMD_ROOM_JOIN_OK                0x1B  // Server confirms room join
 #define CMD_ROOM_MSG                    0x1C  
-
+#define CMD_ROOM_LEAVE_OK               0x1D  
 
 // Error Codes
 // Server Error Response Codes
@@ -33,6 +35,7 @@
 #define ERR_ROOM_CAPACITY_FULL          0x25  
 #define ERR_ROOM_NOT_FOUND              0x26 
 #define ERR_SERVER_ROOM_FULL            0x27
+
 
 #define ERR_PROTOCOL_INVALID_STATE_CMD  0x28
 #define ERR_PROTOCOL_INVALID_FORMAT     0x29   

@@ -5,15 +5,19 @@
 #include "stdbool.h"
 #include <pthread.h> 
 
-#define MAX_CLIENTS_ROOM 100                        // Max clients per room
-#define MAX_ROOMS 100                               // Max rooms
-#define MAX_CLIENTS (MAX_CLIENTS_ROOM * MAX_ROOMS)  // Total possible clients
-                                
-#define MAX_CLIENTS_PER_THREAD 32                   // How many client does each thread handles
 
 
 // MAX THREADS NEEDED
-#define MAX_THREADS ((MAX_CLIENTS + MAX_CLIENTS_PER_THREAD -1) / MAX_CLIENTS_PER_THREAD)
+#define MAX_THREADS  2
+#define MAX_CLIENTS_PER_THREAD 1000                   // How many client does each thread handles
+
+#define MAX_CLIENTS_ROOM 40                        // Max clients per room
+#define MAX_ROOMS 50                               // Max rooms
+#define MAX_CLIENTS (MAX_CLIENTS_ROOM * MAX_ROOMS)  // Total possible clients
+                                
+
+
+
         
 typedef enum ClIENT_STATE {
     AWAITING_USERNAME,
