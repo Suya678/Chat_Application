@@ -46,7 +46,7 @@ int main() {
       perror("Accept failed: ");
       continue;
     }
-    log_message("Created or received FD: %d\n", client_fd);
+    log_message("received FD: %d\n", client_fd);
 
     // Distribute new client connection to one of the worker threads
     distribute_client(client_fd, worker_threads);

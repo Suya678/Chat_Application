@@ -1,7 +1,7 @@
 const net = require("net");
 
 const SERVER_CONFIG = {
-	host: "localhost",
+	host: "10.65.254.25",
 	port: 30000,
 };
 
@@ -58,6 +58,7 @@ const SizeLimits = {
 	MAX_CONTENT_LEN: 128,
 	MAX_CLIENTS: 2000,
 	MAX_ROOMS: 50,
+	MAX_CLIENTS_PER_ROOM: 40
 };
 
 class Client {
@@ -99,6 +100,7 @@ class Client {
 
 			this.socket.on("error", () => {
 				this.socket.destroy();
+				reject(error);
 			});
 		});
 	}
@@ -144,6 +146,7 @@ async function createConnectedClients(numOfClients) {
 function disconnectClients(clients) {
 	clients.forEach((client) => client.disconnect());
 }
+
 jest.setTimeout(100000);
 
 describe(`Connection`, () => {
@@ -342,4 +345,128 @@ describe("Room Creation", () => {
 		disconnectClients(initialRoomClients);
 		disconnectClients(overflowClients);
 	});
+
+
+
+});
+
+
+describe("Room Management", () => {
+	test("Should be able to join an already created room", async () => {
+		const creator = new Client();
+		await creator.connect();
+		await creator.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		creator.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "Creator");
+		await creator.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		creator.sendMessage(ClientToServerCommands.CMD_ROOM_CREATE_REQUEST, "Room");
+		const response = await creator.getResponse(ServerToClientCommands.CMD_ROOM_CREATE_OK);
+		expect(response).toContain("Room created successfully");
+
+		const joiner = new Client();
+		await joiner.connect();
+		await joiner.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		joiner.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "joiner");
+		await joiner.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		joiner.sendMessage(ClientToServerCommands.CMD_ROOM_JOIN_REQUEST, "0");
+		const response2 = await joiner.getResponse(ServerToClientCommands.CMD_ROOM_JOIN_OK);
+		expect(response2).toContain("joined room");
+		   
+		joiner.disconnect();
+		creator.disconnect();
+	});
+
+	test(`Should send an error message when a client tries to join a non exsisting room`, async () => {
+		const creator = new Client();
+		await creator.connect();
+		await creator.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		creator.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "Creator");
+		await creator.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		creator.sendMessage(ClientToServerCommands.CMD_ROOM_CREATE_REQUEST, "Room");
+		const response = await creator.getResponse(ServerToClientCommands.CMD_ROOM_CREATE_OK);
+		expect(response).toContain("Room created successfully");
+
+		const joiner = new Client();
+		await joiner.connect();
+		await joiner.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		joiner.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "joiner");
+		await joiner.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		joiner.sendMessage(ClientToServerCommands.CMD_ROOM_JOIN_REQUEST, "1");
+		const response2 = await joiner.getResponse(SERVER_ERROR_CODES.ERR_ROOM_NOT_FOUND);
+		expect(response2).toContain("Room does not exist");
+		   
+		joiner.disconnect();
+		creator.disconnect();
+	});
+
+	test(`Max number of clients per room (${SizeLimits.MAX_CLIENTS_PER_ROOM}) should be able to join a room`, async () => {
+		const creator = new Client();
+		await creator.connect();
+		await creator.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		creator.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "Creator");
+		await creator.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		creator.sendMessage(ClientToServerCommands.CMD_ROOM_CREATE_REQUEST, "Room");
+		const response = await creator.getResponse(ServerToClientCommands.CMD_ROOM_CREATE_OK);
+		expect(response).toContain("Room created successfully");
+
+		const joiners = await createConnectedClients(SizeLimits.MAX_CLIENTS_PER_ROOM - 1);
+		await Promise.all(
+			joiners.map(async (joiner) => {
+				await joiner.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+				joiner.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "joiner");
+				await joiner.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+				joiner.sendMessage(ClientToServerCommands.CMD_ROOM_JOIN_REQUEST, "0");
+				const response2 = await joiner.getResponse(ServerToClientCommands.CMD_ROOM_JOIN_OK);
+				expect(response2).toContain("joined room");
+			}),
+		);
+		disconnectClients(joiners);
+		creator.disconnect();
+	});
+
+
+	test(`Should send an error message when a client tries to join a room at capacity, clients - (${SizeLimits.MAX_CLIENTS_PER_ROOM})`, async () => {
+		const creator = new Client();
+		await creator.connect();
+		await creator.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+		creator.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "Creator");
+		await creator.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+		creator.sendMessage(ClientToServerCommands.CMD_ROOM_CREATE_REQUEST, "Room");
+		const response = await creator.getResponse(ServerToClientCommands.CMD_ROOM_CREATE_OK);
+		expect(response).toContain("Room created successfully");
+
+		// These should be able to join the room
+		const successJoiners = await createConnectedClients(SizeLimits.MAX_CLIENTS_PER_ROOM - 1);
+		await Promise.all(
+			successJoiners.map(async (joiner) => {
+				await joiner.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+				joiner.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "joiner");
+				await joiner.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+				joiner.sendMessage(ClientToServerCommands.CMD_ROOM_JOIN_REQUEST, "0");
+				const response2 = await joiner.getResponse(ServerToClientCommands.CMD_ROOM_JOIN_OK);
+				expect(response2).toContain("joined room");
+			}),
+		);
+
+		// These should not be able to
+		const unsucessfullJoiners = await createConnectedClients(SizeLimits.MAX_CLIENTS_PER_ROOM );
+		await Promise.all(
+			unsucessfullJoiners.map(async (joiner) => {
+				await joiner.getResponse(ServerToClientCommands.CMD_WELCOME_REQUEST);
+				joiner.sendMessage(ClientToServerCommands.CMD_USERNAME_SUBMIT, "joiner");
+				await joiner.getResponse(ServerToClientCommands.CMD_ROOM_LIST_RESPONSE);
+				joiner.sendMessage(ClientToServerCommands.CMD_ROOM_JOIN_REQUEST, "0");
+				const response2 = await joiner.getResponse(SERVER_ERROR_CODES.ERR_ROOM_CAPACITY_FULL);
+				expect(response2).toContain("Room is full");
+			}),
+		);
+		disconnectClients(successJoiners);
+		disconnectClients(unsucessfullJoiners);
+		creator.disconnect();
+	});
+
+
+
+
+
+	
 });
