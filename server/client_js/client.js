@@ -12,7 +12,8 @@ Just type to send a message when in a room
 Once in room these, only exit and help will work
                     `;
 
-let client_in_room = false;
+
+
 const SERVER_CONFIG = {
     host: 'localhost',
     port: 30000

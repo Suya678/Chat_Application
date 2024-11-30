@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "server.h": "c",
-        "chat_message_handler.h": "c"
+        "chat_message_handler.h": "c",
+        "types.h": "c",
+        "stdio.h": "c",
+        "unistd.h": "c",
+        "string.h": "c",
+        "stdint.h": "c"
     }
 }
