@@ -1,7 +1,7 @@
 const net = require("net");
 
 const SERVER_CONFIG = {
-	host: "10.65.254.25",
+	host: "localhost",
 	port: 30000,
 };
 
@@ -148,7 +148,7 @@ function disconnectClients(clients) {
 }
 
 jest.setTimeout(100000);
-
+for(let i = 0; i < 20; i++) {
 describe(`Connection`, () => {
 	test("Should establish connection and receive welcome message", async () => {
 		const client = new Client();
@@ -470,3 +470,5 @@ describe("Room Management", () => {
 
 	
 });
+
+}

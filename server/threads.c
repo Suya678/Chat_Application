@@ -2,10 +2,11 @@
 // Local
 #include "threads.h" // For our own declarations and constants
 
+#include "chat_message_handler.h" // For send_message_to_client()
 #include "client_handler.h" // Contains the function that the threads will run after being set up
-
 // Library
-#include <errno.h>       // For errno
+#include <errno.h> // For errno
+#include <fcntl.h>
 #include <pthread.h>     // For pthread_create
 #include <stdint.h>      // For uint64_t
 #include <string.h>      // For strlen, strerror, memset
@@ -31,11 +32,12 @@
 void setup_threads(Worker_Thread worker_threads[]) {
   memset(worker_threads, 0, sizeof(Worker_Thread) * MAX_THREADS);
   for (int i = 0; i < MAX_THREADS; i++) {
+    log_message("%d\n", worker_threads[i].num_of_clients);
     worker_threads[i].notification_fd = eventfd(0, EFD_NONBLOCK);
     if (worker_threads[i].notification_fd == -1) {
       print_erro_n_exit("Could not create eventfd");
     }
-
+    sem_init(&worker_threads[i].sem, 0, 1);
     if (pthread_mutex_init(&worker_threads[i].num_of_clients_lock, NULL) != 0) {
       print_erro_n_exit("Could not worker thread num of clients mutex");
     }
@@ -75,30 +77,46 @@ void distribute_client(int client_fd, Worker_Thread workers[]) {
 
   // Finds a worker thread not at capacity,otherwise reject
   pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
-  while (workers[worker_index].num_of_clients == MAX_CLIENTS_PER_THREAD) {
+  while (workers[worker_index].num_of_clients >= MAX_CLIENTS_PER_THREAD) {
     pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
 
     worker_index = (worker_index + 1) % MAX_THREADS;
     num_attempts++;
 
     if (num_attempts == MAX_THREADS) {
-      send(client_fd, capacity_err_msg, strlen(capacity_err_msg), 0);
-      close(client_fd);
+      send_message_to_client(client_fd, ERR_SERVER_FULL, capacity_err_msg);
+      if (close(client_fd) == -1) {
+        log_message("Failed to close client fd %d: %s\n", client_fd,
+                    strerror(errno));
+      }
       log_message(
-          "Connection rejected: Server at capacity (all threads full)\n");
+          "Connection rejected: Server at capacity (all threads full) \n");
       return;
     }
     pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
   }
+  workers[worker_index].num_of_clients++;
   pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
+
+  log_message("Wrote the following to the reciver: %d, num of clients in the "
+              "thread being: %d",
+              client_fd, workers[worker_index].num_of_clients);
+  sem_wait(&workers[worker_index].sem);
 
   // Notify chosen worker thread of new client using eventfd
   if (write(workers[worker_index].notification_fd, &client_fd_as_uint64,
             sizeof(uint64_t)) == -1) {
-    send(client_fd, connection_error_msg, strlen(connection_error_msg), 0);
-    close(client_fd);
+    sem_post(&workers[worker_index].sem);
+    send_message_to_client(client_fd, ERR_CONNECTING, connection_error_msg);
+    if (close(client_fd) == -1) {
+      log_message("Failed to close client fd %d: %s\n", client_fd,
+                  strerror(errno));
+    }
     log_message("Failed to notify worker thread of new connection: %s\n",
                 strerror(errno));
+    pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
+    workers[worker_index].num_of_clients--;
+    pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
     return;
   }
 

@@ -17,10 +17,6 @@
 #include <sys/socket.h> // For recv, send
 #include <unistd.h>     // For close
 
-static void send_message_to_client(Client *client, char cmd_type,
-                                   const char *message);
-static void handle_client_disconnection(Client *client,
-                                        Worker_Thread *thread_context);
 static void handle_awaiting_username(Client *client);
 static void handle_in_chat_lobby(Client *client);
 static void handle_in_chat_room(Client *client);
@@ -90,18 +86,32 @@ void process_client_message(Client *client, Worker_Thread *thread_context) {
  * Constructs a message with a command type, content, and terminator, then sends
  * it to the specified client's socket and logs the message.
  *
- * @param client    Pointer to the Client struct to send message to
+ * @param client_fd  File descriptor of the client to send the message to.
  * @param cmd_type  Command character to prefix the message.
  * @param message   Message content to be sent to the client.
  *
  * @see protocol.h for the message protocol
  */
-static void send_message_to_client(Client *client, char cmd_type,
-                                   const char *message) {
+void send_message_to_client(int client_fd, char cmd_type, const char *message) {
   char message_buffer[MAX_MESSAGE_LEN_FROM_SERVER] = {};
   sprintf(message_buffer, "%c %s%s", cmd_type, message, MSG_TERMINATOR);
 
-  send(client->client_fd, message_buffer, strlen(message_buffer), 0);
+  ssize_t length = strlen(message_buffer);
+  ssize_t sent = 0;
+  while (sent < length) {
+    ssize_t bytes = send(client_fd, message_buffer + sent, length - sent, 0);
+
+    if (bytes == -1) {
+      if (errno == EINTR || errno == EAGAIN) {
+        continue;
+      } else {
+        log_message("Send error\n");
+        break;
+      }
+    } else if (bytes > 0) {
+      sent += bytes;
+    }
+  }
 }
 
 /**
@@ -113,7 +123,7 @@ static void send_message_to_client(Client *client, char cmd_type,
 static bool validate_msg_format(Client *client) {
   // Check if message legnth is less than the minimum
   if (strlen(client->current_msg) < 3) {
-    send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
+    send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
                            "Message too short\nCorrect format:[command "
                            "char][space][message content][MSG_TERMINATOR]\n");
     return false;
@@ -121,7 +131,7 @@ static bool validate_msg_format(Client *client) {
   // Check if space is missing
   if (client->current_msg[1] != ' ') {
     send_message_to_client(
-        client, ERR_PROTOCOL_INVALID_FORMAT,
+        client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
         "Missing space after command.\nCorrect format: [command "
         "char][space][message content][MSG_TERMINATOR]\n");
     return false;
@@ -130,7 +140,7 @@ static bool validate_msg_format(Client *client) {
   // Check if command is not valid
   if (client->current_msg[0] < CMD_EXIT ||
       client->current_msg[0] > CMD_ROOM_MESSAGE_SEND) {
-    send_message_to_client(client, ERR_PROTOCOL_INVALID_FORMAT,
+    send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
                            "Command not found\nCorrect format: [command "
                            "char][space][message content][MSG_TERMINATOR]\n");
     return false;
@@ -142,7 +152,7 @@ static bool validate_msg_format(Client *client) {
     content++;
   }
   if (*content == '\0') {
-    send_message_to_client(client, ERR_MSG_EMPTY_CONTENT,
+    send_message_to_client(client->client_fd, ERR_MSG_EMPTY_CONTENT,
                            "Content is Empty\nCorrect format: [command "
                            "char][space][message content][MSG_TERMINATOR]\n");
     return false;
@@ -199,13 +209,13 @@ static void route_client_command(Client *client,
 static void handle_awaiting_username(Client *client) {
   if (client->current_msg[0] != CMD_USERNAME_SUBMIT) {
     send_message_to_client(
-        client, ERR_PROTOCOL_INVALID_STATE_CMD,
+        client->client_fd, ERR_PROTOCOL_INVALID_STATE_CMD,
         "CMD not correct for client in awaiting username state\n");
     return;
   }
 
   if (strlen(&client->current_msg[2]) > MAX_USERNAME_LEN) {
-    send_message_to_client(client, ERR_USERNAME_LENGTH,
+    send_message_to_client(client->client_fd, ERR_USERNAME_LENGTH,
                            "User name too long, must be less than 32\n");
     return;
   }
@@ -237,7 +247,7 @@ static void handle_in_chat_lobby(Client *client) {
     send_avail_rooms(client);
     break;
   default:
-    send_message_to_client(client, ERR_PROTOCOL_INVALID_STATE_CMD,
+    send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_STATE_CMD,
                            "Invalid command for lobby state\n");
     break;
   }
@@ -286,7 +296,10 @@ static void cleanup_client(Client *client, Worker_Thread *thread_context) {
                 NULL) == -1) {
     perror("epoll_ctl removing client fd failed");
   }
-  close(client->client_fd);
+  if (close(client->client_fd) == -1) {
+    log_message("Failed to close client fd %d: %s\n", client->client_fd,
+                strerror(errno));
+  }
   memset(client, 0, sizeof(Client));
   pthread_mutex_lock(&thread_context->num_of_clients_lock);
 
@@ -305,8 +318,8 @@ static void cleanup_client(Client *client, Worker_Thread *thread_context) {
  * disconnected.
  * @param thread_context Pointer to the Worker_Thread handling the client.
  */
-static void handle_client_disconnection(Client *client,
-                                        Worker_Thread *thread_context) {
+void handle_client_disconnection(Client *client,
+                                 Worker_Thread *thread_context) {
   ClIENT_STATE state = client->state;
   if (state == IN_CHAT_ROOM) {
     int room_index = client->room_index;
@@ -370,8 +383,8 @@ static void broadcast_message_in_room(const char *msg, int room_index,
   for (int i = 0; i < MAX_CLIENTS_ROOM; i++) {
     if (SERVER_ROOMS[room_index].clients[i] != NULL &&
         SERVER_ROOMS[room_index].clients[i] != client) {
-      send_message_to_client(SERVER_ROOMS[room_index].clients[i], CMD_ROOM_MSG,
-                             msg);
+      send_message_to_client(SERVER_ROOMS[room_index].clients[i]->client_fd,
+                             CMD_ROOM_MSG, msg);
     }
   }
 }
@@ -393,20 +406,21 @@ static void join_chat_room(Client *client) {
 
   if (room_index == -1) {
     send_message_to_client(
-        client, ERR_ROOM_NOT_FOUND,
+        client->client_fd, ERR_ROOM_NOT_FOUND,
         "Invalid room number format. Must be a number between 0-99\n");
     return;
   }
 
   pthread_mutex_lock(&SERVER_ROOMS[room_index].room_lock);
   if (SERVER_ROOMS[room_index].in_use == false) {
-    send_message_to_client(client, ERR_ROOM_NOT_FOUND, "Room does not exist\n");
+    send_message_to_client(client->client_fd, ERR_ROOM_NOT_FOUND,
+                           "Room does not exist\n");
     pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);
     return;
   }
 
   if (SERVER_ROOMS[room_index].num_clients == MAX_CLIENTS_ROOM) {
-    send_message_to_client(client, ERR_ROOM_CAPACITY_FULL,
+    send_message_to_client(client->client_fd, ERR_ROOM_CAPACITY_FULL,
                            "Cannot join room: Room is full\n");
     pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);
     return;
@@ -418,7 +432,7 @@ static void join_chat_room(Client *client) {
       SERVER_ROOMS[room_index].num_clients++;
 
       broadcast_message_in_room(client_room_join_msg, room_index, client);
-      send_message_to_client(client, CMD_ROOM_JOIN_OK,
+      send_message_to_client(client->client_fd, CMD_ROOM_JOIN_OK,
                              "Successfully joined room\n");
       client->state = IN_CHAT_ROOM;
       client->room_index = room_index;
@@ -447,7 +461,7 @@ static void create_chat_room(Client *client) {
   const char *room_name = &client->current_msg[2];
 
   if (strlen(room_name) > MAX_ROOM_NAME_LEN) {
-    send_message_to_client(client, ERR_ROOM_NAME_INVALID,
+    send_message_to_client(client->client_fd, ERR_ROOM_NAME_INVALID,
                            "Room creation failed: Room name length invalid\n");
     return;
   }
@@ -461,14 +475,15 @@ static void create_chat_room(Client *client) {
       client->room_index = i;
       SERVER_ROOMS[i].clients[0] = client;
       client->state = IN_CHAT_ROOM;
-      send_message_to_client(client, CMD_ROOM_CREATE_OK, success_msg);
+      send_message_to_client(client->client_fd, CMD_ROOM_CREATE_OK,
+                             success_msg);
       pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
       return;
     }
     pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
   }
   send_message_to_client(
-      client, ERR_ROOM_CAPACITY_FULL,
+      client->client_fd, ERR_ROOM_CAPACITY_FULL,
       "Room creation failed: Maximum number of rooms reached\n");
 }
 
@@ -499,7 +514,8 @@ static void send_avail_rooms(Client *client) {
             "your own chat room.\n");
   }
 
-  send_message_to_client(client, CMD_ROOM_LIST_RESPONSE, room_list_msg);
+  send_message_to_client(client->client_fd, CMD_ROOM_LIST_RESPONSE,
+                         room_list_msg);
 }
 
 /**
@@ -517,7 +533,7 @@ static void handle_in_chat_room(Client *client) {
   char command = client->current_msg[0];
 
   if (command != CMD_ROOM_MESSAGE_SEND && command != CMD_LEAVE_ROOM) {
-    send_message_to_client(client, ERR_PROTOCOL_INVALID_STATE_CMD,
+    send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_STATE_CMD,
                            "Invalid command for in chat room state\n");
   }
 
@@ -533,7 +549,7 @@ static void handle_in_chat_room(Client *client) {
     sprintf(msg, "%s has left the room", client->name);
     leave_room(client, room_index);
     pthread_mutex_lock(&SERVER_ROOMS[room_index].room_lock);
-    send_message_to_client(client, CMD_ROOM_LEAVE_OK,
+    send_message_to_client(client->client_fd, CMD_ROOM_LEAVE_OK,
                            "You have left the room\n");
     pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);
     client->state = IN_CHAT_LOBBY;

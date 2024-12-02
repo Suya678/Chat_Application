@@ -4,8 +4,8 @@
 #include <pthread.h>
 
 #include "protocol.h"
+#include "semaphore.h"
 #include "stdbool.h"
-
 // MAX THREADS NEEDED
 #define MAX_THREADS 2
 #define MAX_CLIENTS_PER_THREAD 1000 // How many client does each thread handles
@@ -37,6 +37,8 @@ typedef struct Worker_Thread {
   int client_fds[MAX_CLIENTS_PER_THREAD];
   Client clients[MAX_CLIENTS_PER_THREAD];
   pthread_mutex_t num_of_clients_lock;
+  sem_t sem;
+
 } Worker_Thread;
 
 typedef struct Room {
