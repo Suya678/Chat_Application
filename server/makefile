@@ -1,11 +1,17 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -DLOG
 
 TARGET = server
 OBJS = main.o server.o chat_message_handler.o threads.o client_handler.o
+LOG = 0
+ifeq ($(LOG),1)
+	CFLAGS += -DLOG
+endif
 
 # Default target
 all: $(TARGET)
+
+
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
