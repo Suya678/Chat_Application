@@ -10,26 +10,25 @@
 #include <errno.h>      // For errno, EAGAIN, EWOULDBLOCK
 #include <pthread.h>    // For pthread_mutex_lock/unlock
 #include <stdbool.h>    // For bool type
-#include <stdio.h>      // For sprintf, snprintf, perror
+#include <stdio.h>      // For sprintf, snprintf, perror()
 #include <stdlib.h>     // For atoi
 #include <string.h>     // For strstr, strcpy, strlen, memset
 #include <sys/epoll.h>  // For epoll_ctl
 #include <sys/socket.h> // For recv, send
 #include <unistd.h>     // For close
-
+#include <string.h>	// For strerror()
 static void handle_awaiting_username(Client *client);
 static void handle_in_chat_lobby(Client *client);
 static void handle_in_chat_room(Client *client);
 static void route_client_command(Client *client, Worker_Thread *thread_context);
-static void send_avail_rooms(Client *client);
+static void send_avail_rooms(const Client *client);
 static void create_chat_room(Client *client);
 static void join_chat_room(Client *client);
 static void cleanup_client(Client *client, Worker_Thread *thread_context);
 static bool validate_msg_format(Client *client);
-static void broadcast_message_in_room(const char *msg, int room_index,
-                                      Client *client);
+static void broadcast_message_in_room(const char *msg, int room_index, const Client *client);
 static void leave_room(Client *client, int room_index);
-static void handle_in_chat_room(Client *client);
+
 
 /**
  * @brief Processes incoming messages from a client socket.
@@ -92,22 +91,20 @@ void process_client_message(Client *client, Worker_Thread *thread_context) {
  *
  * @see protocol.h for the message protocol
  */
-void send_message_to_client(int client_fd, char cmd_type, const char *message) {
+void send_message_to_client(const int client_fd, const char cmd_type, const char *message) {
   char message_buffer[MAX_MESSAGE_LEN_FROM_SERVER] = {};
   sprintf(message_buffer, "%c %s%s", cmd_type, message, MSG_TERMINATOR);
 
-  ssize_t length = strlen(message_buffer);
+  const ssize_t length = strlen(message_buffer);
   ssize_t sent = 0;
   while (sent < length) {
-    ssize_t bytes = send(client_fd, message_buffer + sent, length - sent, 0);
+    ssize_t bytes = send(client_fd, message_buffer + sent, length - sent, MSG_NOSIGNAL);
 
     if (bytes == -1) {
-      if (errno == EINTR || errno == EAGAIN) {
-        continue;
-      } else {
-        log_message("Send error\n");
-        break;
-      }
+    	if (errno != EAGAIN && errno != EWOULDBLOCK) {
+    		log_message("%s Error sending: (%s) to  client with fd %d\n", strerror(errno), message, client_fd);
+    		break;
+    	}
     } else if (bytes > 0) {
       sent += bytes;
     }
@@ -121,7 +118,7 @@ void send_message_to_client(int client_fd, char cmd_type, const char *message) {
  * @return true if the message format is valid, false otherwise
  */
 static bool validate_msg_format(Client *client) {
-  // Check if message legnth is less than the minimum
+  // Check if message length is less than the minimum
   if (strlen(client->current_msg) < 3) {
     send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
                            "Message too short\nCorrect format:[command "
@@ -170,7 +167,7 @@ static bool validate_msg_format(Client *client) {
  * @param client            Pointer to the Client structure which sent the
  * commadn with the message
  * @param thread_context    Pointer to the Worker thread context containing data
- * about the thread hadnling the client
+ * about the thread handling the client
  */
 static void route_client_command(Client *client,
                                  Worker_Thread *thread_context) {
@@ -203,7 +200,7 @@ static void route_client_command(Client *client,
  * and transitions the client to the lobby state.
  *
  * @param client Pointer to the Client structure submitting the username. The
- * user name is in the current msg of the client.
+ * username is in the current msg of the client.
  */
 
 static void handle_awaiting_username(Client *client) {
@@ -229,7 +226,7 @@ static void handle_awaiting_username(Client *client) {
  * @brief Processes commands for clients in the chat lobby state.
  *
  * Validates the command corresponds to the current state, if correct, uses
- * helper funciton to do one fo the following - create a room, join a room or
+ * helper function to do one fo the following - create a room, join a room or
  * list the current available rooms
  *
  * @param client Pointer to the Client structure in the lobby state.
@@ -257,7 +254,7 @@ static void handle_in_chat_lobby(Client *client) {
  * @brief Helper function to parse and validate the room number from the
  * client's message.
  *
- * Extracts and checks the room number format to ensure it's valid. IT shoudl be
+ * Extracts and checks the room number format to ensure it's valid. IT should be
  * between 0 - 99.
  *
  * @param client Pointer to the Client structure in the lobby state requesting
@@ -312,7 +309,7 @@ static void cleanup_client(Client *client, Worker_Thread *thread_context) {
  *
  * Cleans up the client,and if client is in a room, calls leave_room()notifies
  * other clients in the same room, and frees up room resources if the client was
- * the the last client in the room.
+ * the last client in the room.
  *
  * @param client Pointer to the Client structure that has/(requesting to be)
  * disconnected.
@@ -372,14 +369,13 @@ static void leave_room(Client *client, int room_index) {
  * @param msg        The message to broadcast
  * @param room_index The index of the chat room in the SERVER_ROOMS array.
  * @param client      Client the message is being sent from. The message being
- * broadcasted is not send to this client.
+ * broadcast is not send to this client.
  *
  * @note The caller must acquire the room's lock
  * (SERVER_ROOMS[room_index].room_lock) before calling this function to ensure
  * thread safety.
  */
-static void broadcast_message_in_room(const char *msg, int room_index,
-                                      Client *client) {
+static void broadcast_message_in_room(const char *msg, const int room_index, const Client *client) {
   for (int i = 0; i < MAX_CLIENTS_ROOM; i++) {
     if (SERVER_ROOMS[room_index].clients[i] != NULL &&
         SERVER_ROOMS[room_index].clients[i] != client) {
@@ -445,9 +441,9 @@ static void join_chat_room(Client *client) {
 /**
  * @brief handles a client's request to create a room
  *
- * Initalizes a room with the client in it if the following checks do not fail -
- * 1. The room name is less than or equal to to MAX_ROOM_NAME_LEN
- * 2. There is currently space for a creation of a room in the arry-
+ * Initializes a room with the client in it if the following checks do not fail -
+ * 1. The room name is less than or equal to MAX_ROOM_NAME_LEN
+ * 2. There is currently space for a creation of a room in the array-
  * SERVER_ROOMS(no room is in use)
  *
  * @param client Pointer to the Client structure requesting the 'creation' of a
@@ -489,11 +485,11 @@ static void create_chat_room(Client *client) {
 
 /**
  * @brief Sends a list of the currently available(running) rooms on the server
- * that the client can joiing
+ * that the client can joining
  *
  * @param client Pointer to the Client structure requesting the list of rooms
  */
-static void send_avail_rooms(Client *client) {
+static void send_avail_rooms(const Client *client) {
   char room_list_msg[MAX_MESSAGE_LEN_FROM_SERVER] =
       "=== Available Chat Rooms ===\n\n";
   bool rooms_avail = false;
@@ -522,7 +518,7 @@ static void send_avail_rooms(Client *client) {
  * @brief Processes commands for clients in the chat room state
  *
  * Validates that the command corresponds to the current state, if correct, uses
- * helper funciton to do one fo the following - create a room, join a room or
+ * helper function to do one fo the following - create a room, join a room or
  * list the current available rooms
  *
  * @param client Pointer to the Client structure in the lobby state.

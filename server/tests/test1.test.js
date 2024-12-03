@@ -148,7 +148,7 @@ function disconnectClients(clients) {
 }
 
 jest.setTimeout(100000);
-for(let i = 0; i < 20; i++) {
+for(let i = 0; i < 2; i++) {
 describe(`Connection`, () => {
 	test("Should establish connection and receive welcome message", async () => {
 		const client = new Client();

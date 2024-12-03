@@ -23,7 +23,7 @@ static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
  * @param ... additional values to replace format specifiers in format_str
  */
 void log_message(const char *format_str, ...) {
-  /*  va_list args;
+  va_list args;
   va_start(args, format_str);
 
   pthread_mutex_lock(&log_mutex);
@@ -33,7 +33,7 @@ void log_message(const char *format_str, ...) {
 
   // For compatibility but can be ignored in Gcc and clang compilers
   va_end(args);
-  */
+  
 }
 
 /**
