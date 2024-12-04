@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g -DLOG
+CFLAGS = -Wall -Wextra -g
 
 TARGET = server
 OBJS = main.o server.o chat_message_handler.o threads.o client_handler.o
