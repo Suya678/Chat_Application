@@ -53,3 +53,4 @@ dkms.conf
 
 node_modules/
 .idea/
+.vscode/
