@@ -61,6 +61,8 @@ void process_client_message(Client *client, Worker_Thread *thread_context) {
 	ssize_t bytes_received = recv(client->client_fd, read_buffer, MAX_MESSAGE_LEN_TO_SERVER, 0);
 	if (bytes_received <= 0) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			LOG_INFO("Tried getting client fd %d message but errno was EAGAIN or EWOULDBLOCK\n", client->client_fd);
+
 			return;
 		}
 		LOG_INFO("Client fd %d disconnected during receive\n", client->client_fd);
@@ -145,6 +147,17 @@ static bool validate_msg_format(Client *client) {
 				  client->client_fd);
 		send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
 							   "Message too short\nCorrect format:[command "
+							   "char][space][message content][MSG_TERMINATOR]\n");
+		return false;
+	}
+
+
+	// Check if message length is longer  than the maximum
+	if (strlen(&client->current_msg[2]) > MAX_CONTENT_LEN) {
+		LOG_ERROR("Invalid message format from client fd %d: Content too long, content length: %d\nand:%s\n",
+				  client->client_fd, strlen(&client->current_msg[2]), &client->current_msg[2]);
+		send_message_to_client(client->client_fd, ERR_PROTOCOL_INVALID_FORMAT,
+							   "Invalid Foramt: Message too long\nCorrect format:[command "
 							   "char][space][message content][MSG_TERMINATOR]\n");
 		return false;
 	}
@@ -464,8 +477,8 @@ static void join_chat_room(Client *client) {
 	}
 
 	if (SERVER_ROOMS[room_index].num_clients == MAX_CLIENTS_ROOM) {
-		LOG_ERROR("Client %s (fd %d) attempted to join a full room - %d: %s \n", client->name,
-				  client->client_fd, SERVER_ROOMS[room_index].room_name, room_index);
+		LOG_ERROR("Client %s (fd %d) attempted to join a full room - %d: %s , Number of clients currently in the room = %d\n", client->name,
+				  client->client_fd, room_index,  SERVER_ROOMS[room_index].room_name, SERVER_ROOMS[room_index].num_clients);
 		send_message_to_client(client->client_fd, ERR_ROOM_CAPACITY_FULL,
 							   "Cannot join room: Room is full\n");
 		pthread_mutex_unlock(&SERVER_ROOMS[room_index].room_lock);

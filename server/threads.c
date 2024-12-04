@@ -94,7 +94,7 @@ void distribute_client(int client_fd, Worker_Thread workers[]) {
 
 		if (num_attempts == MAX_THREADS) {
 			send_message_to_client(client_fd, ERR_SERVER_FULL, capacity_err_msg);
-			LOG_INFO("Server at capacity - rejecting client (fd=%d)\n", client_fd);
+			LOG_INFO("Server at capacity - rejecting client (fd=%d) with msg  %s\n", client_fd, capacity_err_msg);
 
 			if (close(client_fd) == -1) {
 				LOG_ERROR("Failed to close client fd %d: %s\n", client_fd, strerror(errno));
