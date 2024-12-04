@@ -14,7 +14,8 @@
 Room SERVER_ROOMS[MAX_ROOMS] = {};
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
+#define RED_COLOR "\033[31m"
+#define GREEN_COLOR "\033[32m"
 /**
  * @brief Variadic wrapper around printf for thread-safe
  *
@@ -28,7 +29,7 @@ void log_message(const char *format_str, ...) {
     va_list args;
     va_start(args, format_str);
 
-    pthread_mutex_lock(&log_mutex);
+    pthread_mutex_lock(&log_mutex);    
     vprintf(format_str, args);
     fflush(stdout);
     pthread_mutex_unlock(&log_mutex);
