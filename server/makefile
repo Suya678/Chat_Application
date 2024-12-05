@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 
 TARGET = server
-OBJS = main.o server.o chat_message_handler.o threads.o client_handler.o
+OBJS = main.o room_manager.o client_state_manager.o client_distributor.o connection_handler.o logger.o
 LOG = 0
 ifeq ($(LOG),1)
 	CFLAGS += -DLOG
@@ -16,22 +16,26 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-main.o: main.c
+main.o: main.c server_config.h
 	$(CC) $(CFLAGS) -c main.c -o main.o
 
-server.o: server.c server.h
-	$(CC) $(CFLAGS) -c server.c -o server.o
+room_manager.o: room_manager.c room_manager.h server_config.h
+	$(CC) $(CFLAGS) -c room_manager.c -o room_manager.o
 
-chat_message_handler.o: chat_message_handler.c chat_message_handler.h
-	$(CC) $(CFLAGS) -c chat_message_handler.c -o chat_message_handler.o
-
-
-client_handler.o: client_handler.c client_handler.h
-	$(CC) $(CFLAGS) -c client_handler.c -o client_handler.o
+client_state_manager.o: client_state_manager.c client_state_manager.h server_config.h
+	$(CC) $(CFLAGS) -c client_state_manager.c -o client_state_manager.o
 
 
-threads.o: threads.c threads.h
-	$(CC) $(CFLAGS) -c threads.c -o threads.o
+connection_handler.o: connection_handler.c connection_handler.h server_config.h
+	$(CC) $(CFLAGS) -c connection_handler.c -o connection_handler.o
+
+
+client_distributor.o: client_distributor.c client_distributor.h server_config.h
+	$(CC) $(CFLAGS) -c client_distributor.c -o client_distributor.o
+
+logger.o: logger.o logger.h
+	$(CC) $(CFLAGS) -c logger.c -o logger.o
+
 
 clean:
 	rm -rf $(OBJS) $(TARGET)

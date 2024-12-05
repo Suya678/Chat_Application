@@ -532,7 +532,6 @@ public class ChatServerTest {
 
         }
         disconnectClients(allRoomCreators);
-        Thread.sleep(2000);
         disconnectClients(allJoiners);
 
 
@@ -541,7 +540,7 @@ public class ChatServerTest {
 
     public class Client {
         // Server Config
-        private static final String HOST = "10.65.255.67";
+        private static final String HOST = "localhost";
         private static final int PORT = 30000;
         private final Map<Character, String> message = new HashMap<>();
         private final StringBuilder messageBuffer = new StringBuilder();

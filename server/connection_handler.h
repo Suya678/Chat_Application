@@ -3,5 +3,4 @@
 
 void *process_client_connections(void *worker);
 
-
 #endif
