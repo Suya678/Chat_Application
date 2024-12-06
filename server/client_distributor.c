@@ -5,8 +5,7 @@
 #include "threads.h"              // For our own declarations and constants
 
 // Library
-#include <errno.h> // For errno
-#include <fcntl.h>
+#include <errno.h>      // For errno
 #include <pthread.h>    // For pthread_create
 #include <stdint.h>     // For uint64_t
 #include <string.h>     // For strlen, strerror, memset
@@ -28,8 +27,7 @@ static void handle_write_error(Worker_Thread workers[], int worker_index, int cl
  * @param client_fd file descriptor of the newly accepted client connection
  * @param workers array of worker threads to distribute clients across
  */
-void distribute_client(int client_fd, Worker_Thread workers[])
-{
+void distribute_client(int client_fd, Worker_Thread workers[]) {
     const char *capacity_err_msg = "Sorry, the server is currently at full "
                                    "capacity. Please try again later!\r\n";
 
@@ -41,11 +39,9 @@ void distribute_client(int client_fd, Worker_Thread workers[])
 
     int worker_assigned_index = find_worker_not_at_capacity(workers);
 
-    if (worker_assigned_index == -1)
-    {
+    if (worker_assigned_index == -1) {
         send_message_to_client(client_fd, ERR_SERVER_FULL, capacity_err_msg);
-        if (close(client_fd) == -1)
-        {
+        if (close(client_fd) == -1) {
             LOG_SERVER_ERROR("Failed to close client fd %d: %s\n", client_fd, strerror(errno));
         }
         return;
@@ -55,14 +51,12 @@ void distribute_client(int client_fd, Worker_Thread workers[])
              "clients=%d)\n",
              client_fd, worker_assigned_index, workers[worker_assigned_index].id);
 
-    if (sem_wait(&workers[worker_assigned_index].new_client) == -1)
-    {
+    if (sem_wait(&workers[worker_assigned_index].new_client) == -1) {
         LOG_SERVER_ERROR("sem_Wait failed in distribute_client: %s\n", strerror(errno));
     }
 
     // Notify chosen worker thread of new client using eventfd
-    if (write(workers[worker_assigned_index].notification_fd, &client_fd_as_uint64, sizeof(uint64_t)) == -1)
-    {
+    if (write(workers[worker_assigned_index].notification_fd, &client_fd_as_uint64, sizeof(uint64_t)) == -1) {
         handle_write_error(workers, worker_assigned_index, client_fd);
         return;
     }
@@ -81,21 +75,18 @@ void distribute_client(int client_fd, Worker_Thread workers[])
  * @param worker_index Index of worker that failed
  * @param client_fd Client connection to clean up
  */
-static void handle_write_error(Worker_Thread workers[], int worker_index, int client_fd)
-{
+static void handle_write_error(Worker_Thread workers[], int worker_index, int client_fd) {
     const char *connection_error_msg = "Sorry, there was an error connecting to the server. Please try "
                                        "again!\r\n";
 
     LOG_SERVER_ERROR("Failed to notify worker thread %d of new client (fd=%d): %s\n", worker_index, client_fd,
                      strerror(errno));
 
-    if (sem_post(&workers[worker_index].new_client) == -1)
-    {
+    if (sem_post(&workers[worker_index].new_client) == -1) {
         LOG_SERVER_ERROR("sem_wait in distribute_client fialed: \n", strerror(errno));
     }
     send_message_to_client(client_fd, ERR_CONNECTING, connection_error_msg);
-    if (close(client_fd) == -1)
-    {
+    if (close(client_fd) == -1) {
         LOG_SERVER_ERROR("Failed to close client fd %d: %s\n", client_fd, strerror(errno));
     }
     pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
@@ -107,29 +98,24 @@ static void handle_write_error(Worker_Thread workers[], int worker_index, int cl
 /**
  * @brief Finds next available worker thread that can accept new clients
  *
- * Uses round-robin selection with the following logic and aintains static index
+ * Uses round-robin selection with. Maintains a static index
  * for distribution. Checks each worker's current client count. Returns first
- * worker found under capacity.Returns -1 if all workers are at capacity.
- *
- * Thread-safe: Uses mutex locks when accessing worker client counts
+ * worker found under capacity. Returns -1 if all workers are at capacity.
  *
  * @param workers Array of worker threads to search
  * @return index of selected worker, or -1 if all workers at capacity
  */
-static int find_worker_not_at_capacity(Worker_Thread workers[])
-{
+static int find_worker_not_at_capacity(Worker_Thread workers[]) {
     static int worker_index = 0;
     int selected_worker;
     int num_attempts = 0;
 
     // Finds a worker thread not at capacity,otherwise reject
     pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
-    while (workers[worker_index].num_of_clients >= MAX_CLIENTS_PER_THREAD)
-    {
+    while (workers[worker_index].num_of_clients >= MAX_CLIENTS_PER_THREAD) {
         pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
         worker_index = (worker_index + 1) % MAX_THREADS;
-        if (num_attempts++ == MAX_THREADS)
-        {
+        if (num_attempts++ == MAX_THREADS) {
             return -1;
         }
         pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);

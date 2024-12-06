@@ -33,7 +33,7 @@ connection_handler.o: connection_handler.c connection_handler.h server_config.h
 client_distributor.o: client_distributor.c client_distributor.h server_config.h
 	$(CC) $(CFLAGS) -c client_distributor.c -o client_distributor.o
 
-logger.o: logger.o logger.h
+logger.o: logger.c logger.h
 	$(CC) $(CFLAGS) -c logger.c -o logger.o
 
 

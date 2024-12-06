@@ -1,2 +1,3 @@
 ---
 BasedOnStyle: microsoft
+BreakBeforeBraces: Attach

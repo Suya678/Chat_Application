@@ -16,11 +16,10 @@ static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
  *
  * @param format_str format string to be written to standard output. Can contain
  *                  format specifiers which will be replaced by values from
- * additional arguments.
+ *                   additional arguments.
  * @param ... additional values to replace format specifiers in format_str
  */
-void log_message(const char *format_str, ...)
-{
+void log_message(const char *format_str, ...) {
     va_list args;
     char time_stamp[200];
     struct tm t;
@@ -28,14 +27,11 @@ void log_message(const char *format_str, ...)
     time_t now = time(NULL);
 
     pthread_mutex_lock(&log_mutex);
-    if (localtime_r(&now, &t) != NULL)
-    {
+    if (localtime_r(&now, &t) != NULL) {
         strftime(time_stamp, sizeof(time_stamp), "%Y:%m:%d:%T", &t);
         printf("%s║%s %s%s%s%s %s║%s ", ANSI_MAGENTA, ANSI_RESET, ANSI_BOLD, ANSI_CYAN, time_stamp, ANSI_RESET,
                ANSI_MAGENTA, ANSI_RESET);
-    }
-    else
-    {
+    } else {
         printf("localtime_r error\n");
     }
     printf("%s[TID- %lu]%s ", "\033[95;2m", pthread_self(), ANSI_RESET);
@@ -50,14 +46,10 @@ void log_message(const char *format_str, ...)
  * @brief Prints an error message and exits the program
  * @param char *msg msg to be printed before exiting
  */
-void print_erro_n_exit(char *msg)
-{
-    if (errno != 0)
-    {
+void print_erro_n_exit(char *msg) {
+    if (errno != 0) {
         perror(msg);
-    }
-    else
-    {
+    } else {
         fprintf(stderr, "%s\n", msg);
     }
     exit(EXIT_FAILURE);

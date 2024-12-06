@@ -1,12 +1,11 @@
-
 #define _GNU_SOURCE // Enables GNU extensions required for the ccept4()
                     // function
 
 // Local headers
 #include "client_distributor.h" // Custom header containing thread-related definitions and functions
 #include "connection_handler.h" // Contains the function that the threads will run after being set up, handles all functionality related to when the the client is succesfully connected
-#include "logger.h"             // Has the logging functin for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
-#include "server_config.h"      // Custom header containing server configuration
+#include "logger.h" // Has the logging functin for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING and also the print_err_n_exit
+#include "server_config.h" // Custom header containing server configuration
 
 // System/Library headers
 #include <errno.h>       // Provides error codes like EAGAIN, EWOULDBLOCK and errno variable
@@ -34,8 +33,7 @@ static void setup_threads(Worker_Thread worker_threads[]);
  *
  * @note press ctrl c to exit the server
  */
-int main()
-{
+int main() {
     int server_listen_fd, client_fd;
     // these threads will manage the clients
     Worker_Thread worker_threads[MAX_THREADS];
@@ -51,15 +49,12 @@ int main()
     // printf is only ever used here
     printf("Waiting for connection on Port %d \n", PORT_NUMBER);
 
-    while (1)
-    {
+    while (1) {
         // Accept new connection with non-blocking socket
         client_fd = accept4(server_listen_fd, NULL, NULL, SOCK_NONBLOCK);
 
-        if (client_fd == -1)
-        {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-            {
+        if (client_fd == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 continue;
             }
             LOG_SERVER_ERROR("Accept failed: %s\n", strerror(errno));
@@ -67,8 +62,7 @@ int main()
         }
         LOG_INFO("New client connection accepted: fd=%d\n", client_fd);
 
-        if (set_socket_keep_alive(client_fd) == -1)
-        {
+        if (set_socket_keep_alive(client_fd) == -1) {
             continue;
         }
 
@@ -89,35 +83,30 @@ int main()
  * @returns - 0 on success, -1 on failure
  * Ref:https://stackoverflow.com/questions/31426420/configuring-tcp-keepalive-after-accept
  */
-static int set_socket_keep_alive(int socket)
-{
-    int enable = 1;
-    int idle_time = 5;
-    int interval = 1;
-    int probes = 2;
+static int set_socket_keep_alive(int socket) {
+    int enable = 1;    // enable tcp keep alive
+    int idle_time = 5; // wait 5 seconds befor the first pkeep alive proble
+    int interval = 1;  // wait 1 second between each subsequent probe
+    int probes = 2;    // send 2 close before the conneciton is considered dead
 
     LOG_INFO("Configuring keepalive for socket %d\n", socket, idle_time, interval, probes);
 
-    if (setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) == -1)
-    {
+    if (setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) == -1) {
         LOG_SERVER_ERROR("Error in setsockopt(SO_KEEPALIVE): %s\n", strerror(errno));
         return -1;
     }
 
-    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPIDLE, &idle_time, sizeof(idle_time)) == -1)
-    {
+    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPIDLE, &idle_time, sizeof(idle_time)) == -1) {
         LOG_SERVER_ERROR("Error in setsockopt(TCP_KEEPIDLE): %s\n", strerror(errno));
         return -1;
     }
 
-    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) == -1)
-    {
+    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) == -1) {
         LOG_SERVER_ERROR("Error in setsockopt(TCP_KEEPINTVL): %s\n", strerror(errno));
         return -1;
     }
 
-    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) == -1)
-    {
+    if (setsockopt(socket, IPPROTO_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) == -1) {
         LOG_SERVER_ERROR("Error in setsockopt(TCP_KEEPCNT): %s\n", strerror(errno));
         return -1;
     }
@@ -141,29 +130,23 @@ static int set_socket_keep_alive(int socket)
  * @see process_client_connections() in "connection_handler.c" The function each
  * worker thread will run
  */
-static void setup_threads(Worker_Thread worker_threads[])
-{
+static void setup_threads(Worker_Thread worker_threads[]) {
     LOG_INFO("Initializing %d worker threads\n", MAX_THREADS);
     memset(worker_threads, 0, sizeof(Worker_Thread) * MAX_THREADS);
-    for (int i = 0; i < MAX_THREADS; i++)
-    {
+    for (int i = 0; i < MAX_THREADS; i++) {
         worker_threads[i].notification_fd = eventfd(0, EFD_NONBLOCK);
-        if (worker_threads[i].notification_fd == -1)
-        {
+        if (worker_threads[i].notification_fd == -1) {
             print_erro_n_exit("Could not create event_fd in setup_threads");
         }
 
-        if (sem_init(&worker_threads[i].new_client, 0, 1) == -1)
-        {
+        if (sem_init(&worker_threads[i].new_client, 0, 1) == -1) {
             print_erro_n_exit("Could not initialize semaphore in setup_threads\n");
         }
 
-        if (pthread_mutex_init(&worker_threads[i].num_of_clients_lock, NULL) != 0)
-        {
+        if (pthread_mutex_init(&worker_threads[i].num_of_clients_lock, NULL) != 0) {
             print_erro_n_exit("Could not worker thread num of clients mutex");
         }
-        if (pthread_create(&worker_threads[i].id, NULL, process_client_connections, &worker_threads[i]) != 0)
-        {
+        if (pthread_create(&worker_threads[i].id, NULL, process_client_connections, &worker_threads[i]) != 0) {
             print_erro_n_exit("Failed to create worker thread");
         }
         LOG_INFO("Successfully initialized worker thread %d\n", i);
@@ -178,13 +161,10 @@ static void setup_threads(Worker_Thread worker_threads[])
  * @note This function will exit the program if any room mutex initialization
  * fails
  */
-static void init_server_rooms()
-{
+static void init_server_rooms() {
     memset(&SERVER_ROOMS, 0, sizeof(Room) * MAX_ROOMS);
-    for (int i = 0; i < MAX_ROOMS; i++)
-    {
-        if (pthread_mutex_init(&SERVER_ROOMS[i].room_lock, NULL) != 0)
-        {
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        if (pthread_mutex_init(&SERVER_ROOMS[i].room_lock, NULL) != 0) {
             print_erro_n_exit("Failed to initialize mutex for a server room in "
                               "init_server_room");
         }
@@ -203,30 +183,25 @@ static void init_server_rooms()
  * @note ON failure during the socket creation, binding or listening system
  * calls, this function will print an error and exit.
  */
-static int setup_server(int port_number, int backlog)
-{
+static int setup_server(int port_number, int backlog) {
     int server_fd;
     int value = 1;
     struct sockaddr_in server_address = {
         .sin_family = AF_INET, .sin_port = htons(port_number), .sin_addr.s_addr = INADDR_ANY};
 
     server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (server_fd == -1)
-    {
+    if (server_fd == -1) {
         print_erro_n_exit("Socket creation failed");
     }
 
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value)) == -1)
-    {
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value)) == -1) {
         print_erro_n_exit("setsockopt failed");
     }
-    if (bind(server_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
-    {
+    if (bind(server_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         print_erro_n_exit("Bind failed");
     }
 
-    if (listen(server_fd, backlog) == -1)
-    {
+    if (listen(server_fd, backlog) == -1) {
         print_erro_n_exit("Listen call failed");
     }
 
