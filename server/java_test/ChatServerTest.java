@@ -202,9 +202,9 @@
       */
      @Test
      public void testAcceptValidUsernamesFromMaxClients() throws IOException, InterruptedException {
-       List<Client> clients = new ArrayList<>();
+       List<Client> clients = createConnectedClients(MAX_CLIENTS);
 
-       for (Client client : clients) {
+       for (Client client: clients) {
          client.getResponse(CMD_WELCOME_REQUEST);
          client.sendMessage(CMD_USERNAME_SUBMIT, "User");
          String response = client.getResponse(CMD_ROOM_LIST_RESPONSE);
