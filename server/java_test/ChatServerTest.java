@@ -13,7 +13,6 @@ import static org.junit.Assert.fail;
  */
 public class ChatServerTest {
     // Size Limits
-
     public static final int MAX_CLIENTS = 2000;
     public static final int MAX_ROOMS = 50;
     public static final int MAX_USERNAME_LEN = 32;
@@ -69,6 +68,7 @@ public class ChatServerTest {
      */
     private void disconnectClients(List<Client> clients) throws InterruptedException, IOException {
         for (Client client : clients) {
+            Thread.sleep(50);
             client.close();
         }
     }
@@ -98,7 +98,12 @@ public class ChatServerTest {
 
     }
 
-
+    /**
+     * @param username The username for the new client
+     * @return List of random strings
+     * sends the userName to the server and returns the new Clietn
+     * @brief Creates a new client, and waits the for the welcome message from the server,
+     */
     private Client setupClientWithUsername(String username) throws IOException {
         Client client = new Client();
         client.getResponse(CMD_WELCOME_REQUEST);
@@ -228,6 +233,9 @@ public class ChatServerTest {
         client.close();
     }
 
+    /**
+     * Tests that the server rejects room creation when the room name exceeds the maximum allowed length.
+     */
     @Test
     public void testRejectLongRoomName() throws IOException, InterruptedException {
         Client client = setupClientWithUsername("a");
@@ -242,6 +250,9 @@ public class ChatServerTest {
     }
 
 
+    /**
+     * Tests that the server allows creating the maximum number of rooms without errors.
+     */
     @Test
     public void testCreateMaxRooms() throws IOException, InterruptedException {
         List<Client> clients = new ArrayList<>();
@@ -259,6 +270,10 @@ public class ChatServerTest {
 
     }
 
+
+    /**
+     * Tests that the server prevents creating new rooms once the maximum room capacity is reached.
+     */
     @Test
     public void testRejectRoomCreationWhenAtCapacity() throws IOException, InterruptedException {
         List<Client> initialClients = new ArrayList<>();
@@ -285,7 +300,9 @@ public class ChatServerTest {
 
     }
 
-
+    /**
+     * Tests that the server returns a correct list of all created rooms.
+     */
     @Test
     public void testProperListingOfCreatedRooms() throws IOException, InterruptedException {
         List<Client> roomCreators = new ArrayList<>();
@@ -312,6 +329,9 @@ public class ChatServerTest {
     }
 
 
+    /**
+     * Tests that the server allows the maximum number of users to join a single room.
+     */
     @Test
     public void testMaxUsersShouldBeAbleToJoinARoom() throws IOException, InterruptedException {
         Client roomCreator = setupClientWithUsername("Room Creator");
@@ -336,7 +356,9 @@ public class ChatServerTest {
 
     }
 
-
+    /**
+     * Tests that the server returns a correct list of all created rooms.
+     */
     @Test
     public void testAllClientsReceiveMessages() throws IOException, InterruptedException {
         List<String> messages = getRandomStrings(30, MAX_CONTENT_LENGTH - 1);
@@ -375,6 +397,9 @@ public class ChatServerTest {
 
     }
 
+    /**
+     * Tests that users can leave a room and receive an appropriate confirmation from the server.
+     */
     @Test
     public void testUserSCanLeaveRoom() throws IOException, InterruptedException {
 
@@ -397,6 +422,9 @@ public class ChatServerTest {
 
     }
 
+    /**
+     * Tests that a room remains active even after its creator leaves.
+     */
     @Test
     public void testRoomPersistsAfterUserLeaves() throws IOException, InterruptedException {
         List<Client> clients = new ArrayList<>();
@@ -419,8 +447,6 @@ public class ChatServerTest {
 
         clients.get(0).sendMessage(CMD_ROOM_LIST_REQUEST, "dummy");
         response = clients.get(0).getResponse(CMD_ROOM_LIST_RESPONSE);
-        System.out.println(response);
-        System.out.println(response.length());
         assertTrue(response.contains("Dummy Room"));
 
 
@@ -429,6 +455,9 @@ public class ChatServerTest {
 
     }
 
+    /**
+     * Tests that users can create new rooms after leaving a previously joined room.
+     */
     @Test
     public void testUsersCanCreateRoomAfterLeaving() throws IOException, InterruptedException {
 
@@ -454,6 +483,10 @@ public class ChatServerTest {
         disconnectClients(clients);
 
     }
+
+    /**
+     * Tests that users can rejoin the same room after leaving it.
+     */
 
     @Test
     public void testUsersCanJoinSameRoomAfterLeaving() throws IOException, InterruptedException {
@@ -493,12 +526,14 @@ public class ChatServerTest {
 
     }
 
+    /**
+     * Tests the server properly closes the connection when a client sends the exit command.
+     */
     @Test
     public void testIfServerClosesConnectionOnExitCommand() throws IOException, InterruptedException {
         Client client = new Client();
         client.getResponse(CMD_WELCOME_REQUEST);
         client.sendMessage(CMD_EXIT, "d");
-        Thread.sleep(20);
         if (client.socket.getInputStream().read() == -1) {
             assert (true);
         } else {
@@ -508,8 +543,11 @@ public class ChatServerTest {
         client.close();
     }
 
+    /**
+     * Tests that all clients in all rooms receive messages from their respective room creators
+     */
     @Test
-    public void testAllClientsReceiveMessagesinAllRooms() throws IOException, InterruptedException {
+    public void testBroadcastMessagesToAllRoomsAndClients() throws IOException, InterruptedException {
         List<Client> allRoomCreators = new ArrayList<>();
         List<Client> allJoiners = new ArrayList<>();
 
@@ -540,7 +578,7 @@ public class ChatServerTest {
 
     public class Client {
         // Server Config
-        private static final String HOST = "localhost";
+        private static final String HOST = "10.65.255.67";
         private static final int PORT = 30000;
         private final Map<Character, String> message = new HashMap<>();
         private final StringBuilder messageBuffer = new StringBuilder();
@@ -548,12 +586,26 @@ public class ChatServerTest {
         private final BufferedWriter writer;
         private final InputStream in;
 
+        /**
+         * @brief Initializes the client by connecting to the server and setting up writing and reading streams.
+         * <p>
+         * Establishes a connection to the server at the specified host and port.
+         */
         public Client() throws IOException {
             socket = new Socket(HOST, PORT);
             writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             in = socket.getInputStream();
+
         }
 
+        /**
+         * @param expectedCmd The command type to wait for in the server's response.
+         * @return The content portion of the server's response associated with the expected command.
+         * @brief Retrieves the server's response to a previously sent command.
+         * <p>
+         * This method reads data from the server socket until the expected command type is found in the response.
+         * It processes incoming data, extracts messages based on the expected command, and returns the associated content.
+         */
         public String getResponse(char expectedCmd) throws IOException, IndexOutOfBoundsException {
             try {
                 while (!message.containsKey(expectedCmd)) {
@@ -585,12 +637,19 @@ public class ChatServerTest {
 
         }
 
+        /**
+         * @param cmdType Command of the message
+         * @param content Content portion of the message
+         * @brief Sends the given content with the cmdtype to the server socket
+         */
         public void sendMessage(char cmdType, String content) throws IOException {
             writer.write(cmdType + " " + content + "\r\n");
             writer.flush();
         }
 
-
+        /**
+         * @brief Closes the socket. Introduces a small delay between rapid sleep calls
+         */
         public void close() throws IOException, InterruptedException {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
