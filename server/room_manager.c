@@ -96,9 +96,8 @@ void send_avail_rooms(const Client *client) {
         pthread_mutex_lock(&SERVER_ROOMS[i].room_lock);
         if (SERVER_ROOMS[i].in_use == true) {
             char room_entry[100];
-            sprintf(room_entry, "Room %d: %s", i, SERVER_ROOMS[i].room_name);
+            sprintf(room_entry, "Room %d: %s\n", i, SERVER_ROOMS[i].room_name);
             strcat(room_list_msg, room_entry);
-            LOG_USER_ERROR("ROOM ADDED MSG LENGTH:  %zu\n\n", strlen(room_list_msg));
             rooms_avail = true;
         }
         pthread_mutex_unlock(&SERVER_ROOMS[i].room_lock);
