@@ -40,8 +40,8 @@ CommandFormat commands[] = {
     {"/create", 0x03, 1, "\x03 %s\r\n"},  // CMD_ROOM_CREATE_REQUEST
     {"/join", 0x05, 1, "\x05 %s\r\n"},    // CMD_ROOM_JOIN_REQUEST
     {"/exit", 0x01, 0, "\x01 dummy\r\n"}, // CMD_EXIT
-    {"/msg", 0x07, 1, "\x07 %s\r\n"},     // CMD_MESSAGE_SEND // change to 07 ***********************
-    {"/leave", 0x06, 0, "\x06 %s\r\n"},   // CMD_LEAVE_ROOM  //change to 06
+    {"/msg", 0x07, 1, "\x07 %s\r\n"},     // CMD_MESSAGE_SEND 
+    {"/leave", 0x06, 0, "\x06 %s\r\n"},   // CMD_LEAVE_ROOM  
     {"/list", 0x04, 0, "\x04 dummy\r\n"}  // CMD_ROOM_LIST_REQUEST
 };
 
