@@ -30,10 +30,10 @@
 
 #define ERR_PROTOCOL_INVALID_STATE_CMD 0x28  // Invalid command for the client's state,such as requesting to join a room when they are in AWAITING_USERNAME state
 #define ERR_PROTOCOL_INVALID_FORMAT 0x29    // THe message is not correctly formated
-#define ERR_MSG_EMPTY_CONTENT 0x2A         //  Every message should not have empty content, can put dummy contnet for /leave room and exit
+#define ERR_MSG_EMPTY_CONTENT 0x2A         //  Every message should not have empty content, can put dummy content for /leave room and exit
 #define ERR_SERVER_FULL 0x2B               // The server is currently full
 #define ERR_CONNECTING 0x2C               // Something went wrong when trying to hand off the client to a worker thread
-#define ERR_USERNAME_LENGTH 0x2D         // The user name lenght is > MAX username length
+#define ERR_USERNAME_LENGTH 0x2D         // The user name length is > MAX username length
 
 
 // Size limits

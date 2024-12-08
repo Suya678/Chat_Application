@@ -22,6 +22,7 @@
   minimum, the program will have 2 threads in total(1 main and 1 worker).
 - Tests were ran with logging of.
 
+
 ## Note
 
 - Linux has a default fil descriptor limit. This was changed prior to the test: ulimit -n 99999
