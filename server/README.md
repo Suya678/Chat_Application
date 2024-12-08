@@ -1,6 +1,6 @@
-# Chat Server
+# Server Component
 
-This is the server component of the Multi Thread Chat Application, handling multiple client connections and message routing.
+This is the server component of the Chat Application, handling multiple client connections and message routing.
 
 ## Related Documentation
 
@@ -15,8 +15,13 @@ This is the server component of the Multi Thread Chat Application, handling mult
   - Provides three different log levels with colors using ANSI Escape codes: `LOG_INFO`, `LOG_USER_ERRROR`, `LOG_SERVER_ERROR` and `LOG_CLIENT_DISCONNECT`.
 
 ## Running the Server
-
+**Note: When running the server, please change the linux's default file descriptor limit prior to running the server by enter the following in bash:** 
 ```bash
+ulimit -n 99999
+```
+**To run**
+```bash
+
 cd server
 make clean
 make LOG=1 #Optional skip the log and just enter: make, if you would not like logging information
