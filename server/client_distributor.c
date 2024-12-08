@@ -1,16 +1,13 @@
 
 // Local
 #include "client_state_manager.h" // For send_message_to_client()
-#include "logger.h"               // Has the logging functin for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
-#include "threads.h"              // For our own declarations and constants
-
+#include "logger.h"               // Has the logging function for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
 // Library
-#include <errno.h>      // For errno
 #include <pthread.h>    // For pthread_create
 #include <stdint.h>     // For uint64_t
-#include <string.h>     // For strlen, strerror, memset
-#include <sys/socket.h> // For send
 #include <unistd.h>     // For write, close
+#include "string.h"    // For strerror
+#include "errno.h"     // For errno
 
 static int find_worker_not_at_capacity(Worker_Thread workers[]);
 
@@ -62,8 +59,8 @@ void distribute_client(int client_fd, Worker_Thread workers[]) {
     }
 }
 /**
- * @brief Handles write error that occurs when trying to write a new cliend fd
- * to the notificaiton fd in the worker thread
+ * @brief Handles write error that occurs when trying to write a new client fd
+ * to the notification fd in the worker thread
  *
  * Performs cleanup when writing to worker's notification fd fails:
  * 1. Posts back to semaphore
@@ -92,7 +89,6 @@ static void handle_write_error(Worker_Thread workers[], int worker_index, int cl
     pthread_mutex_lock(&workers[worker_index].num_of_clients_lock);
     workers[worker_index].num_of_clients--;
     pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
-    return;
 }
 
 /**
@@ -107,7 +103,6 @@ static void handle_write_error(Worker_Thread workers[], int worker_index, int cl
  */
 static int find_worker_not_at_capacity(Worker_Thread workers[]) {
     static int worker_index = 0;
-    int selected_worker;
     int num_attempts = 0;
 
     // Finds a worker thread not at capacity,otherwise reject
@@ -123,7 +118,7 @@ static int find_worker_not_at_capacity(Worker_Thread workers[]) {
 
     workers[worker_index].num_of_clients++;
     pthread_mutex_unlock(&workers[worker_index].num_of_clients_lock);
-    selected_worker = worker_index;
+    int selected_worker = worker_index;
     worker_index = (worker_index + 1) % MAX_THREADS;
 
     return selected_worker;

@@ -2,7 +2,7 @@
 // Local
 #include "client_state_manager.h" // For our own declarations and constants
 
-#include "logger.h"   // Has the logging functin for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
+#include "logger.h"   // Has the logging function for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
 #include "protocol.h" // For command types, message length constants
 #include "room_manager.h"
 
@@ -26,7 +26,7 @@ static void route_client_command(Client *client, Worker_Thread *thread_context);
 static void cleanup_client(Client *client, Worker_Thread *thread_context);
 
 static bool validate_msg_format(Client *client);
-static bool command_valid_for_state(Client *client);
+static bool command_valid_for_state(const Client *client);
 
 /**
  * @brief Reads client messages and process them.
@@ -185,11 +185,11 @@ static bool validate_msg_format(Client *client) {
 /**
  * @brief Validates if client's command is permitted in their current state
  *
- * @param client  Pointer to the Client structure containg command in the
+ * @param client  Pointer to the Client structure contain command in the
  *                message field
  * @returns true if command is valid for client's current state, false otherwise
  */
-static bool command_valid_for_state(Client *client) {
+static bool command_valid_for_state(const Client *client) {
     char command = client->current_msg[0];
 
     if (command == CMD_EXIT) {
@@ -226,7 +226,7 @@ static bool command_valid_for_state(Client *client) {
  * on the client's state
  *
  * @param client            Pointer to the Client structure which sent the
- * commadn with the message
+ * command with the message
  * @param thread_context    Pointer to the Worker thread context containing data
  * about the thread handling the client
  */
@@ -264,7 +264,7 @@ static void route_client_command(Client *client, Worker_Thread *thread_context) 
  * and transitions the client to the lobby state.
  *
  * @param client Pointer to the Client structure submitting the username. The
- * username is in the contnet portion of the current msg of the client.
+ * username is in the content portion of the current msg of the client.
  */
 
 static void handle_awaiting_username(Client *client) {

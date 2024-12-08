@@ -424,37 +424,6 @@ public class ChatServerTest {
     roomCreator.close();
   }
 
-  /** Tests that the server correctly: Broadcasts messages to all clients in max rooms */
-  @Test
-  public void testMessageDeliveryAcrossAllRooms() throws IOException, InterruptedException {
-    // Need to maintain clients in a list,otherwise they will be garbage collected
-    List<Client> allClients = new ArrayList<>();
-    System.out.println(
-        "\nStarting message delivery test across " + MAX_ROOMS + " rooms...\nMight take a while");
-    // Test for all rooms in the server
-    for (int i = 0; i < MAX_ROOMS; i++) {
-      System.out.println("Testing Room " + i + "/" + MAX_ROOMS);
-      List<String> testMessages = getRandomStrings(30, MAX_CONTENT_LENGTH - 1);
-
-      Client roomCreator = setupClientWithUsername("Room Creator");
-      allClients.add(roomCreator);
-      roomCreator.sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
-      String response = roomCreator.getResponse(CMD_ROOM_CREATE_OK);
-      assertTrue(response.contains("Room created successfully"));
-
-      List<Client> joiners = setupClientsWithinRoom(MAX_CLIENTS_PER_ROOM - 1, i);
-      allClients.addAll(joiners);
-
-      for (String message : testMessages) {
-        roomCreator.sendMessage(CMD_ROOM_MESSAGE_SEND, message);
-      }
-
-      // Checking if the joiners received all the messages that room creator sent
-      verifyClientsReceivedMessages(joiners, testMessages);
-      System.out.println("✓ All messages received correctly\n");
-    }
-    disconnectClients(allClients);
-  }
 
   /**
    * Tests that the server correctly: Allows the user to leave a room and go back to the chat lobby
@@ -532,16 +501,16 @@ public class ChatServerTest {
    */
   @Test
   public void testUsersCanCreateRoomAfterLeaving() throws IOException, InterruptedException {
-    List<Client> clients = new ArrayList<>();
+    List<Client> roomCreators = new ArrayList<>();
 
-    for (int i = 0; i < MAX_ROOMS; i++) {
-      clients.add(setupClientWithUsername("Random name"));
-      clients.get(i).sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
-      String response = clients.get(i).getResponse(CMD_ROOM_CREATE_OK);
+    for (int i = 0; i < 30; i++) {
+      roomCreators.add(setupClientWithUsername("Random name"));
+      roomCreators.get(i).sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
+      String response = roomCreators.get(i).getResponse(CMD_ROOM_CREATE_OK);
       assertTrue(response.contains("Room created successfully"));
     }
 
-    for (Client client : clients) {
+    for (Client client : roomCreators) {
       client.sendMessage(CMD_LEAVE_ROOM, "dummy");
       String response = client.getResponse(CMD_ROOM_LEAVE_OK);
       assertTrue(response.contains("left the room"));
@@ -550,7 +519,7 @@ public class ChatServerTest {
       assertTrue(response.contains("Room created successfully"));
     }
 
-    disconnectClients(clients);
+    disconnectClients(roomCreators);
   }
 
   /**

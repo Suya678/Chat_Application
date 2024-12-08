@@ -4,7 +4,7 @@
 #include <stdbool.h> // For bool type
 #include <stdio.h>
 #include <stdlib.h> // For atoi()
-#include <string.h> // For strcopy(), strlen()
+#include <string.h> // For strcpy(), strlen()
 
 #include "client_state_manager.h"
 #include "logger.h"
@@ -19,8 +19,8 @@
  * to join the room
  *
  * @return The parsed room number, or -1 if the format is invalid.
- * @NOTE THis funciton would need to be changed slighty, if the max number of rooms exceeds 99 as it can only correctly
- * verify up to 2 digit numbers.
+ * @NOTE THis function would need to be changed slight, if the max number of rooms exceeds 99 as it can only correctly
+ * verify up to 2-digit numbers.
  */
 static int parse_room_number(Client *client) {
     char *room_index = &client->current_msg[2];
@@ -28,7 +28,7 @@ static int parse_room_number(Client *client) {
     if (!isdigit(*room_index)) {
         return -1;
     }
-    // Checks if there are the number is double digit
+    // Checks if the number is double-digit
     if (room_index[1] != '\0') {
         if (!isdigit(room_index[1]) || room_index[2] != '\0') {
             return -1;
@@ -83,7 +83,7 @@ void create_chat_room(Client *client) {
 
 /**
  * @brief Sends a list of the currently available(running) rooms on the server
- * that the client can joining
+ * that the client can join
  *
  * @param client Pointer to the Client structure requesting the list of rooms
  */
