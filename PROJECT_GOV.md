@@ -42,7 +42,7 @@ In this document, we outline the coding and documentation standards adopted by t
 | Dec 8       | Finalized server configuration (4 worker threads) - 6000 max clients                                                      |
 | Dec 8       | Server completed with all the necessary documents                                                                         |
 
-## Server Development Major Milestones
+## Client Development Major Milestones
 | Date    | Development Activity                                                |
 |---------|---------------------------------------------------------------------|
 | Nov 19  | Basic client that can connect make a request to a server            |
