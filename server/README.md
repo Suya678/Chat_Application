@@ -15,6 +15,9 @@ This is the server component of the Chat Application, handling multiple client c
   - Provides three different log levels with colors using ANSI Escape codes: `LOG_INFO`, `LOG_USER_ERRROR`, `LOG_SERVER_ERROR` and `LOG_CLIENT_DISCONNECT`.
 
 ## Running the Server
+**Note: By default, the server listesn on localhost over port 30000, this can be changed via HOST and PORT MACROS In main.c** 
+
+
 **Note: When running the server, please change the linux's default file descriptor limit prior to running the server by enter the following in bash:** 
 ```bash
 ulimit -n 99999
