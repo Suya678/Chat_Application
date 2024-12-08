@@ -36,32 +36,30 @@ protocol defined in protocol.h in the root folder of the repo.
   ```bash 
   make
   ```
-**Note**: Differnet machines may produce differnt results. It was observed that on other machines, the tcp connection would be closed by the Java client, but on the server side, it would show as established. This course is unknonwn, as
-running lsof while inn this state shows that the connection is still established, so the server program cant actually know if the process was the cause of it
 
 ## Known Issue
 *This issue does not occur on the course-provided VM.*
 ### Connection State Inconsistencies
-**Operating System Differences**: On a separate machine from the course provided Vm, the following was observed:
+**On a separate machine from the course provided VM, the following was observed:**: 
 * Java client disconnects ~6000 clients in quick succession
 * Server shows connection as still established
 * Each test relies on the server not having any prior connected clients. So, some of the tests fail.
 * `lsof` confirms connection remains established
 
-**Root Cause**: Unknown however, it only happens during rapid disconnections ~6000 clients at once
-**Note**: Pressing `Ctrl+C` to terminate the Java test program will properly close all client connections, as it triggers the JVM shutdown hook that runs cleanup code. 
-This implies the connection state inconsistency is likely related to how quickly connections are closed, rather than an issue with the closing process itself.
-It does not happen on the 
+**Root Cause**: Unknown however, it only happens during rapid disconnections ~6000 clients at once.
+
+**Note**: Pressing `Ctrl+C` to terminate the Java test program will properly close all client connections.
+This implies the connection state inconsistency may be related to how quickly connections are closed, rather than an issue with server not cleaning up dead clients.
+Also, the issue disappears if small delay is put between client disconnections using ```Thread.sleep()``` function in java.
 
 ## System Constraints
-
 * Maximum Clients: 6000
 * Maximum Rooms: 50
 * Maximum Username Length: 32 characters
 * Maximum Room Name Length: 24 characters
 * Maximum Clients per Room: 120
 * Maximum Content Length: 128 characters
-* Worker threads used By The Server: 128
+* Worker threads used By The Server: 4
 
 
 # Test Cases
@@ -100,11 +98,11 @@ It does not happen on the
 | `testusersCanLeaveRoom`                 | Tests multiple users can leave a room and go back to the chat chat lobby                                                                    | Multiple users after creating a room should be able to leave a room and get a response that contains "left the room"                                                                                     | ✓             |
 | `testroomIsCleanedUpAfterALlUsersLeave` | Tests that the server correctly cleans up the resources used by a room when all clients leave                                               | After a client creates a room, leaves it and then sends a list room command, the server should respond back with a list that contains "No chat rooms available", indicating that the room was cleaned up | ✓             |
 | `testUsersCanCreateRoomAfterLeaving`    | Tests that users after leaving a room can create another room                                                                               | After a client creates a room, leaves it and then sends a create room command, the server successfully completes the request                                                                             | ✓             |
-| `testRoomPersistsAfterUserLeaves`       | Checks if the room is not falsely cleaned up after the creation leaves with other members in it                                             | Room creator leaves the room with other clients in it. When the create sends the list command, server responds with a list which includes the room that the room creator had created                     | ✓             |
+| `testRoomPersistsAfterUserLeaves`       | Checks if the room is not falsely cleaned up after the room creator leaves with other members in it                                         | Room creator leaves the room with other clients in it. When the create sends the list command, server responds with a list which includes the room that the room creator had created                     | ✓             |
 | `testUsersCanJoinSameRoomAfterLeaving`  | Tests if the user can join the same room if it still had some clients after leaving it                                                      | After leaving a room, the client should be able to rejoin the room they left with other clients in it.                                                                                                   | ✓             |
-| `testAllClientsReceiveMessagesInARoom`  | Tests that a message send in a room is broadcast to all clients other than the sender in the room. This was tested with MAX_CLIENTS_IN_ROOM | After sending a message in a room, other clients should correctly receive the message send by the client                                                                                                 | ✓             |
-| `testRoomJoinMessageToExistingUser`     | Tests when a user joins if other members are notified                                                                                       | Room members should get a 'name: joined...' whenever a new user joins the room                                                                                                                           | ✓             |
-| `testMessageIsolationBetweenRooms`      | Tests that messages in a room are only broadcast to the clients in the same room                                                            | After a client sends a message in a room, clients in the same room should be able to get that message. Clients in other rooms should not.                                                                | ✓             |
+| `testAllClientsReceiveMessagesInARoom`  | Tests that a message sent in a room is broadcast to all clients in the room except for the sender. This was tested with MAX_CLIENTS_IN_ROOM | After sending a message in a room, other clients should correctly receive the message send by the client                                                                                                 | ✓             |
+| `testRoomJoinMessageToExistingUser`     | Tests when a user joins if other members are notified.                                                                                      | Room members should get a 'name: joined...' whenever a new user joins the room                                                                                                                           | ✓             |
+| `testMessageIsolationBetweenRooms`      | Tests that messages in a room are only broadcast to the clients in the same room                                                            | After a client sends a message in a room, clients in the same room should be able to get that message. Clients in other rooms should not get that message.                                               | ✓             |
 
 
 ## EXIT
