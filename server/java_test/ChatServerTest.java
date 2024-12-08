@@ -194,7 +194,7 @@ public class ChatServerTest {
    * proper welcome messages to each connected client
    */
   @Test
-  public void testMaxClientsConnection() throws IOException, InterruptedException {
+  public void testMaxClientsConnections() throws IOException, InterruptedException {
     List<Client> clients = createConnectedClients(MAX_CLIENTS);
     for (Client client : clients) {
       String welcomeMessage = client.getResponse(CMD_WELCOME_REQUEST);
@@ -400,32 +400,8 @@ public class ChatServerTest {
     disconnectClients(joiners);
   }
 
-  /**
-   * Tests that the server correctly: Broadcasts all message by one client to other clients in a
-   * single room.
-   */
-  @Test
-  public void testAllClientsReceiveMessagesInARoom() throws IOException, InterruptedException {
-    List<String> testMessages = getRandomStrings(30, MAX_CONTENT_LENGTH - 1);
-    Client roomCreator = setupClientWithUsername("Room Creator");
-    roomCreator.sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
-    String response = roomCreator.getResponse(CMD_ROOM_CREATE_OK);
-    assertTrue(response.contains("Room created successfully"));
-    List<Client> joiners = setupClientsWithinRoom(MAX_CLIENTS_PER_ROOM - 1, 0);
 
-    for (String message : testMessages) {
-      roomCreator.sendMessage(CMD_ROOM_MESSAGE_SEND, message);
-    }
-
-    // Checking if the joiners received all the messages that room creator sent
-    verifyClientsReceivedMessages(joiners, testMessages);
-
-    disconnectClients(joiners);
-    roomCreator.close();
-  }
-
-
-  /**
+/**
    * Tests that the server correctly: Allows the user to leave a room and go back to the chat lobby
    */
   @Test
@@ -447,23 +423,51 @@ public class ChatServerTest {
     disconnectClients(clients);
   }
 
+    /**
+     * Tests that the server correctly: Cleans up the resources used by a room when all clients have
+     * left the room
+     */
+    @Test
+    public void testroomIsCleanedUpAfterALlUsersLeave() throws IOException, InterruptedException {
+      Client roomCreator = setupRoomCreator("Room Creator", "Dummy Room");
+
+      roomCreator.sendMessage(CMD_LEAVE_ROOM, "Room");
+
+      assertTrue(roomCreator.getResponse(CMD_ROOM_LEAVE_OK).contains("left the room"));
+
+      roomCreator.sendMessage(CMD_ROOM_LIST_REQUEST, "Dummy content");
+      assertTrue(roomCreator.getResponse(CMD_ROOM_LIST_RESPONSE).contains("No chat rooms available"));
+
+      roomCreator.close();
+    }
+
   /**
-   * Tests that the server correctly: Cleans up the resources used by a room when all clients have
-   * left the room
+   * Tests that the server correctly: Allows a user to create a room after they have left a room.
    */
   @Test
-  public void roomIsCleanedUpAfterALlUsersLeave() throws IOException, InterruptedException {
-    Client roomCreator = setupRoomCreator("Room Creator", "Dummy Room");
+  public void testUsersCanCreateRoomAfterLeaving() throws IOException, InterruptedException {
+    List<Client> roomCreators = new ArrayList<>();
 
-    roomCreator.sendMessage(CMD_LEAVE_ROOM, "Room");
+    for (int i = 0; i < 30; i++) {
+      roomCreators.add(setupClientWithUsername("Random name"));
+      roomCreators.get(i).sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
+      String response = roomCreators.get(i).getResponse(CMD_ROOM_CREATE_OK);
+      assertTrue(response.contains("Room created successfully"));
+    }
 
-    assertTrue(roomCreator.getResponse(CMD_ROOM_LEAVE_OK).contains("left the room"));
+    for (Client client : roomCreators) {
+      client.sendMessage(CMD_LEAVE_ROOM, "dummy");
+      String response = client.getResponse(CMD_ROOM_LEAVE_OK);
+      assertTrue(response.contains("left the room"));
+      client.sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
+      response = client.getResponse(CMD_ROOM_CREATE_OK);
+      assertTrue(response.contains("Room created successfully"));
+    }
 
-    roomCreator.sendMessage(CMD_ROOM_LIST_REQUEST, "Dummy content");
-    assertTrue(roomCreator.getResponse(CMD_ROOM_LIST_RESPONSE).contains("No chat rooms available"));
-
-    roomCreator.close();
+    disconnectClients(roomCreators);
   }
+
+
 
   /**
    * Tests that the server correctly: Does not clean up the room resources if a client leaves if
@@ -496,31 +500,6 @@ public class ChatServerTest {
     disconnectClients(clients);
   }
 
-  /**
-   * Tests that the server correctly: Allows a user to create a room after they have left a room.
-   */
-  @Test
-  public void testUsersCanCreateRoomAfterLeaving() throws IOException, InterruptedException {
-    List<Client> roomCreators = new ArrayList<>();
-
-    for (int i = 0; i < 30; i++) {
-      roomCreators.add(setupClientWithUsername("Random name"));
-      roomCreators.get(i).sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
-      String response = roomCreators.get(i).getResponse(CMD_ROOM_CREATE_OK);
-      assertTrue(response.contains("Room created successfully"));
-    }
-
-    for (Client client : roomCreators) {
-      client.sendMessage(CMD_LEAVE_ROOM, "dummy");
-      String response = client.getResponse(CMD_ROOM_LEAVE_OK);
-      assertTrue(response.contains("left the room"));
-      client.sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
-      response = client.getResponse(CMD_ROOM_CREATE_OK);
-      assertTrue(response.contains("Room created successfully"));
-    }
-
-    disconnectClients(roomCreators);
-  }
 
   /**
    * Tests that the server correctly: Allows a user to join the same room they left if there were
@@ -561,20 +540,32 @@ public class ChatServerTest {
     disconnectClients(roomJoiners);
   }
 
-  /** Tests that the server correctly: Closes the connection when the user requests to exit */
-  @Test
-  public void testIfServerClosesConnectionOnExitCommand() throws IOException, InterruptedException {
-    Client client = new Client();
-    client.getResponse(CMD_WELCOME_REQUEST);
-    client.sendMessage(CMD_EXIT, "d");
-    if (client.socket.getInputStream().read() == -1) {
-      assert (true);
-    } else {
-      assert (false);
-    }
 
-    client.close();
-  }
+
+
+    /**
+     * Tests that the server correctly: Broadcasts all message by one client to other clients in a
+     * single room.
+     */
+    @Test
+    public void testAllClientsReceiveMessagesInARoom() throws IOException, InterruptedException {
+      List<String> testMessages = getRandomStrings(30, MAX_CONTENT_LENGTH - 1);
+      Client roomCreator = setupClientWithUsername("Room Creator");
+      roomCreator.sendMessage(CMD_ROOM_CREATE_REQUEST, "Room");
+      String response = roomCreator.getResponse(CMD_ROOM_CREATE_OK);
+      assertTrue(response.contains("Room created successfully"));
+      List<Client> joiners = setupClientsWithinRoom(MAX_CLIENTS_PER_ROOM - 1, 0);
+
+      for (String message : testMessages) {
+        roomCreator.sendMessage(CMD_ROOM_MESSAGE_SEND, message);
+      }
+
+      // Checking if the joiners received all the messages that room creator sent
+      verifyClientsReceivedMessages(joiners, testMessages);
+
+      disconnectClients(joiners);
+      roomCreator.close();
+    }
 
   /**
    * Tests that the server correctly: Broadcasts a message that a new member has joined to existing
@@ -599,6 +590,9 @@ public class ChatServerTest {
     roomCreator.close();
     disconnectClients(joiners);
   }
+
+
+
 
   /**
    * Tests that the server correctly: Only broadcasts room to clients in the same room. Maintains
@@ -643,6 +637,21 @@ public class ChatServerTest {
     room2Creator.close();
     disconnectClients(room1Joiners);
     disconnectClients(room2Joiners);
+  }
+
+  /** Tests that the server correctly: Closes the connection when the user requests to exit */
+  @Test
+  public void testIfServerClosesConnectionOnExitCommand() throws IOException, InterruptedException {
+    Client client = new Client();
+    client.getResponse(CMD_WELCOME_REQUEST);
+    client.sendMessage(CMD_EXIT, "d");
+    if (client.socket.getInputStream().read() == -1) {
+      assert (true);
+    } else {
+      assert (false);
+    }
+
+    client.close();
   }
 
   public class Client {

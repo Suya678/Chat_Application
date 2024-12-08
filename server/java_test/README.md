@@ -6,79 +6,112 @@ protocol defined in protocol.h in the root folder of the repo.
 
 ## Test Environment
 
-* Operating System : Ubuntu Noble/Jammy
+- **OS**: Ubuntu 22.04.4 LTS Jammy
 * Network :  Both the server and the client were over local host
 
 ## Prerequisites
-
 * Makefile and Java compiler. Comes with the Junit Jar in th directory
 
-## To run
+## To replicate
+1. Open up two terminals
+2. In the server terminal:
+* Change the default fd limit:
+  ```bash
+  ulimit -n 99999
+  ```
+* (Tests will fail otherwise due to Linux default limit)
 
-* Just type "make" in Shell.
+3. In the first terminal:
+* Navigate to server directory
+* Clean and rebuild server with logging:
+  ```bash
+  make clean
+  make LOG=1    # Recommended
+  ./server
+  ```
 
-![Demo](demo.gif)
+4. Once the server has started, In the second terminal:
+* Navigate to test folder
+* Build and run tests:
+  ```bash 
+  make
+  ```
+**Note**: Differnet machines may produce differnt results. It was observed that on other machines, the tcp connection would be closed by the Java client, but on the server side, it would show as established. This course is unknonwn, as
+running lsof while inn this state shows that the connection is still established, so the server program cant actually know if the process was the cause of it
+
+## Known Issue
+*This issue does not occur on the course-provided VM.*
+### Connection State Inconsistencies
+**Operating System Differences**: On a separate machine from the course provided Vm, the following was observed:
+* Java client disconnects ~6000 clients in quick succession
+* Server shows connection as still established
+* Each test relies on the server not having any prior connected clients. So, some of the tests fail.
+* `lsof` confirms connection remains established
+
+**Root Cause**: Unknown however, it only happens during rapid disconnections ~6000 clients at once
+**Note**: Pressing `Ctrl+C` to terminate the Java test program will properly close all client connections, as it triggers the JVM shutdown hook that runs cleanup code. 
+This implies the connection state inconsistency is likely related to how quickly connections are closed, rather than an issue with the closing process itself.
+It does not happen on the 
 
 ## System Constraints
 
-* Maximum Clients: 2000
+* Maximum Clients: 6000
 * Maximum Rooms: 50
 * Maximum Username Length: 32 characters
 * Maximum Room Name Length: 24 characters
-* Maximum Clients per Room: 40
+* Maximum Clients per Room: 120
 * Maximum Content Length: 128 characters
+* Worker threads used By The Server: 128
+
 
 # Test Cases
 
 ## Connection Tests
 
-| Test Name                             | Purpose                                                                                                          | Expected Behavior                                                                | Actual Result                                           |
-|---------------------------------------|------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|---------------------------------------------------------|
-| `testBasicConnection`                 | Verifies basic client-server connection                                                                          | Server should respond with welcome message containing "WELCOME TO THE SERVER"    | ✓ Welcome message received correctly                    |
-| `testMaxClientsConnection`            | Tests server's ability to handle maximum number of clients connecting to it                                      | Server should accept all connections up to MAX_CLIENTS and send welcome messages | ✓ All connections accepted with proper welcome messages |
-| `testRejectTooManyClients`            | Verifies server behavior when exceeding max clients                                                              | Server should reject connections beyond MAX_CLIENTS with error message           | ✓ Connection rejected with "capacity full" message      |
-| `testFreeUpConnectionAfterDisconnect` | Checks if server properly handles client disconnection. If a client leaves, their resources should be cleaned up | Server should allow new connection after an existing client disconnects          | ✓ New connection accepted after disconnect              |
+| Test Name                             | Purpose                                                                                                          | Expected Behavior                                                                                                        | Pass                                                    |
+|---------------------------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| `testBasicConnection`                 | Verifies basic client-server connection                                                                          | Server should accept the client connection and send a response with a welcome message containing "WELCOME TO THE SERVER" | ✓                                                       |
+| `testMaxClientsConnections`           | Tests server's ability to handle maximum number of clients connecting to it                                      | Server should accept all connections up to MAX_CLIENTS and send welcome messages                                         | ✓                                                       |
+| `testRejectClientsWhenAtFullCapacity` | Verifies server behavior when exceeding max clients                                                              | Server should reject connections beyond MAX_CLIENTS with an error message                                                | ✓                                                       |
+| `testFreeUpConnectionAfterDisconnect` | Checks if server properly handles client disconnection. If a client leaves, their resources should be cleaned up | Server should allow new connection after an existing client disconnects                                                  | ✓                                                       |
 
 ## Test setting up user
-
-| Test Name                                | Purpose                                             | Expected Behavior                                                    | Actual Result                                       |
-|------------------------------------------|-----------------------------------------------------|----------------------------------------------------------------------|-----------------------------------------------------|
-| `testRejectEmptyUsername`                | Validates username submission constraints           | Server should reject empty usernames with "Content is Empty" message | ✓ Empty username rejected properly                  |
-| `testRejectLongUsername`                 | Tests username length validation                    | Server should reject usernames longer than MAX_USER_NAME_LENGTH      | ✓ Long username rejected with an appopriate message |
-| `testAcceptValidUsernamesFromMaxClients` | Verifies username registration from Maximum Clients | Server should accept valid usernames from maximum number of clients  | ✓ Valid usernames accepted from all clients         |
+| Test Name                                | Purpose                                                                             | Expected Behavior                                                    | Actual Result |
+|------------------------------------------|-------------------------------------------------------------------------------------|----------------------------------------------------------------------|---------------|
+| `testRejectEmptyUsername`                | Validates username submission constraints                                           | Server should reject empty usernames with "Content is Empty" message | ✓             |
+| `testRejectLongUsername`                 | Tests username length validation                                                    | Server should reject usernames longer than MAX_USER_NAME_LENGTH      | ✓             |
+| `testAcceptValidUsernamesFromMaxClients` | Verifies the server can correctly handle username registration from Maximum Clients | Server should accept valid usernames from maximum number of clients  | ✓             |
 
 ## Test Room creation
 
-| Test Name                              | Purpose                                                   | Expected Behavior                                                      | Actual Result                                |
-|----------------------------------------|-----------------------------------------------------------|------------------------------------------------------------------------|----------------------------------------------|
-| `testCreateValidRoom`                  | Tests basic room creation functionality for a single user | Server should create room and confirm with success message             | ✓ Room created successfully                  |
-| `testRejectLongRoomName`               | Validates room name length constraints                    | Server should reject room names longer than MAX_ROOM_LENGTH characters | ✓ Long room name rejected with error message |
-| `testCreateMaxRooms`                   | Tests server's ability to handle maximum rooms            | Server should allow creation of MAX_ROOMS (50) rooms                   | ✓ All rooms created successfully             |
-| `testRejectRoomCreationWhenAtCapacity` | Verifies room limit enforcement                           | Server should reject room creation when at maximum capacity            | ✓ Room creation rejected when at capacity    |
-| `testProperListingOfCreatedRooms`      | Validates room listing functionality                      | Server should properly list all created rooms                          | ✓ All rooms listed correctly                 |
-| `testMaxUsersShouldBeAbleToJoinARoom`  | Tests room joining capacity                               | Server should allow MAX_CLIENTS_PER_ROOM users to join                 | Maximum users successfully joined            |
+| Test Name                              | Purpose                                                   | Expected Behavior                                                       | Actual Result |
+|----------------------------------------|-----------------------------------------------------------|-------------------------------------------------------------------------|---------------|
+| `testCreateValidRoom`                  | Tests basic room creation functionality for a single user | Server should create room and confirm with a success message response   | ✓             |
+| `testRejectLongRoomName`               | Validates room name length constraints                    | Server should reject room names longer than MAX_ROOM_LENGTH characters  | ✓             |
+| `testCreateMaxRooms`                   | Tests server's ability to handle MAX_ROOMS creation       | Server should allow creation of MAX_ROOMS  rooms                        | ✓             |
+| `testRejectRoomCreationWhenAtCapacity` | Verifies room limit enforcement                           | Server should reject room creation when at maximum Room number capacity | ✓             |
+| `testProperListingOfCreatedRooms`      | Validates room listing functionality                      | Server should properly list all created rooms                           | ✓             |
 
 ## Test Room Management
 
-| Test Name                                | Purpose                                                                                         | Expected Behavior                                                                                                             | Actual Result                                                                                            |
-|------------------------------------------|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `testuserCanLeaveRoom`                   | Tests if a user is able to leave a room, back to the lobby and enter another room               | User should be able to exit the room and then either create a new room or join a new room or re enter the room that they left | ✓ User was able to leave the room and perform all of the actions outline in expected                     |
-| `testUserJoinIsBroadcasted`              | Tests when a user joins if other members are notifited                                          | Room members should get a 'name: joined...' whenever a new user joins the room                                                | ✓ Previous room members were informed via a message that a new user has joined                           |
-| `testRoompersistsAfterCreatorLeaves`     | Checks if the room is  not falsely cleaned up after the creater leaves with other members in it | User leaves the room with other memebres and the room persists                                                                | ✓ User was able to leave the room and the room persisted as other memebrs could chat after the user left |
-| `testMaxUsersShouldBeAbleToJChatInARoom` | Validates chat functionality with maximum users                                                 | All users should pre-defined messages in a full room                                                                          | Messages delivered to all users                                                                          |
+| Test Name                               | Purpose                                                                                                                                     | Expected Behavior                                                                                                                                                                                        | Actual Result |
+|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `testMaxUsersShouldBeAbleToJoinARoom`   | Tests that the server is able to handle MAX_CLIENTS_PER_ROM joining a single room                                                           | Server should allow MAX_CLIENTS_PER_ROOM users to join                                                                                                                                                   | ✓             |
+| `testusersCanLeaveRoom`                 | Tests multiple users can leave a room and go back to the chat chat lobby                                                                    | Multiple users after creating a room should be able to leave a room and get a response that contains "left the room"                                                                                     | ✓             |
+| `testroomIsCleanedUpAfterALlUsersLeave` | Tests that the server correctly cleans up the resources used by a room when all clients leave                                               | After a client creates a room, leaves it and then sends a list room command, the server should respond back with a list that contains "No chat rooms available", indicating that the room was cleaned up | ✓             |
+| `testUsersCanCreateRoomAfterLeaving`    | Tests that users after leaving a room can create another room                                                                               | After a client creates a room, leaves it and then sends a create room command, the server successfully completes the request                                                                             | ✓             |
+| `testRoomPersistsAfterUserLeaves`       | Checks if the room is not falsely cleaned up after the creation leaves with other members in it                                             | Room creator leaves the room with other clients in it. When the create sends the list command, server responds with a list which includes the room that the room creator had created                     | ✓             |
+| `testUsersCanJoinSameRoomAfterLeaving`  | Tests if the user can join the same room if it still had some clients after leaving it                                                      | After leaving a room, the client should be able to rejoin the room they left with other clients in it.                                                                                                   | ✓             |
+| `testAllClientsReceiveMessagesInARoom`  | Tests that a message send in a room is broadcast to all clients other than the sender in the room. This was tested with MAX_CLIENTS_IN_ROOM | After sending a message in a room, other clients should correctly receive the message send by the client                                                                                                 | ✓             |
+| `testRoomJoinMessageToExistingUser`     | Tests when a user joins if other members are notified                                                                                       | Room members should get a 'name: joined...' whenever a new user joins the room                                                                                                                           | ✓             |
+| `testMessageIsolationBetweenRooms`      | Tests that messages in a room are only broadcast to the clients in the same room                                                            | After a client sends a message in a room, clients in the same room should be able to get that message. Clients in other rooms should not.                                                                | ✓             |
 
-## Template
 
-| Test Name              | Purpose | Expected Behavior | Actual Result |
-|------------------------|---------|-------------------|---------------|
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
-| `testuserCanLeaveRoom` |         |                   | ✓             |
+## EXIT
 
+| Test Name                                   | Purpose                                                                                    | Expected Behavior                                                           | Actual Result |
+|---------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|---------------|
+| `testIfServerClosesConnectionOnExitCommand` | Tests that the server correctly closes the connection when the client sends a exit command | Server should close client connection after the client sends a exit command | ✓             |
 
 
 
