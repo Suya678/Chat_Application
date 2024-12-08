@@ -10,7 +10,7 @@ This document describes the protocol used for communication between the client a
 - **Structure**: `<1-byte-command><space><content>` followed by a message terminator (`\r\n`).
 - **Rules**:
     - Content cannot be empty.
-    - For commands like `/leave` or `/exit`, dummy content should be included and will be ignored.
+    - For commands like `/leave` or `/exit`, dummy content could be included and will be ignored.
   
 -**Message not formated as described here may cause buffer overflow**
 
