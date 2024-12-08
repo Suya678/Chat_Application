@@ -11,8 +11,7 @@ This document describes the protocol used for communication between the client a
 - **Rules**:
     - Content cannot be empty.
     - For commands like `/leave` or `/exit`, dummy content can be included and will be ignored.
-    - Maximum content size from Client: 128 bytes.
-
+  
 -**Message not formated as described here may cause buffer overflow**
 
 ---
@@ -69,7 +68,7 @@ This document describes the protocol used for communication between the client a
 | `MAX_ROOM_NAME_LEN`           | `24`       | Maximum room name length.                                     |
 | `MAX_MESSAGE_LEN_TO_SERVER`   | `132`      | Maximum message length from client to server.                 |
 | `MAX_MESSAGE_LEN_FROM_SERVER` | `variable` | Maximum message length from server, accommodating room lists. |
-| `MAX_CONTENT_LEN`             | `128`      | Maximum content size in a message.                            |
+| `MAX_CONTENT_LEN`             | `128`      | Maximum content size in a message from the client.                            |
 
 
 ---
