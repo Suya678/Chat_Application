@@ -191,7 +191,7 @@ void join_chat_room(Client *client) {
     sprintf(client_room_join_msg, "%s has entered the room\n", client->name);
     int room_index = parse_room_number(client);
 
-    if (room_index == -1 || room_index >= MAX_ROOMS -1) {
+    if (room_index == -1 || room_index >= MAX_ROOMS) {
         LOG_USER_ERROR("Client %s (fd %d) provided invalid room number for joining\n", client->name, client->client_fd);
         send_message_to_client(client->client_fd, ERR_ROOM_NOT_FOUND,
                                "Invalid room number format. Must be a number between 0-49\n");
