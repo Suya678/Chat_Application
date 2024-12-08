@@ -42,6 +42,8 @@ public class ChatServerTest {
   public static final char ERR_ROOM_NAME_INVALID = 0x24;
   public static final char ERR_ROOM_CAPACITY_FULL = 0x25;
   public static final char CMD_EXIT = 0x01;
+  public static final char ERR_PROTOCOL_INVALID_STATE_CMD = 0x28;
+  public static final char ERR_PROTOCOL_INVALID_FORMAT = 0x29;
 
   /**
    * Creates and connects multiple test clients to the server.
@@ -469,7 +471,7 @@ public class ChatServerTest {
     roomCreator.sendMessage(CMD_ROOM_LIST_REQUEST, "dummy");
     roomCreator.getResponse(
         CMD_ROOM_LIST_RESPONSE); // We need to skip this one as it was the one that the user first
-                                 // got when they connected
+    // got when they connected
     response = roomCreator.getResponse(CMD_ROOM_LIST_RESPONSE);
     assertTrue(response.contains("Dummy Room"));
 
@@ -611,6 +613,92 @@ public class ChatServerTest {
     client.close();
   }
 
+  /**
+   * Tests that the server correctly: Sends an error message when it receives a message with an
+   * unknown command not defined in the protocol.h
+   */
+  @Test
+  public void testServerRejectsInvalidCommands() throws IOException, InterruptedException {
+    Client client = setupClientWithUsername("a");
+    char invalidCHar = 0x28;
+
+    client.sendMessage(invalidCHar, "d");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_FORMAT);
+    assertTrue(response.contains("Command not found"));
+    client.close();
+  }
+
+  /**
+   * Tests that the server sends an appropriate error message when a client in the lobby attempts to
+   * leave a room, which is an invalid action for the current state.
+   */
+  @Test
+  public void testServerHandlesLeaveRoomFromLobbyWithError()
+      throws IOException, InterruptedException {
+    Client client = setupClientWithUsername("aaaa");
+    client.sendMessage(CMD_LEAVE_ROOM, "d");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_STATE_CMD);
+    System.out.println(response);
+    assertTrue(response.contains("Invalid command for lobby state"));
+    client.close();
+  }
+
+  /**
+   * Tests that the server sends an appropriate error message when a client in the lobby attempts to
+   * submit a username.
+   */
+  @Test
+  public void testServerHandlesSubmitUsernameFromLobbyWithError()
+      throws IOException, InterruptedException {
+    Client client = setupClientWithUsername("aaaa");
+    client.sendMessage(CMD_USERNAME_SUBMIT, "d");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_STATE_CMD);
+    System.out.println(response);
+    assertTrue(response.contains("Invalid command for lobby state"));
+    client.close();
+  }
+
+  /**
+   * Tests that the server sends an appropriate error message when a client in the room attempts to
+   * create a room, which is an invalid action for the current state.
+   */
+  @Test
+  public void testServerErrorOnJoinRoomWhileAlreadyInRoom()
+      throws IOException, InterruptedException {
+    Client client = setupRoomCreator("aaaa", "Dummy Room");
+    client.sendMessage(CMD_ROOM_JOIN_REQUEST, "99");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_STATE_CMD);
+    assertTrue(response.contains("Invalid command for in chat room state"));
+    client.close();
+  }
+
+  /**
+   * Tests that the server sends an appropriate error message when a client in the room attempts to
+   * create a room, which is an invalid action for the current state.
+   */
+  @Test
+  public void testServerErrorOnCreateRoomWhileAlreadyInRoom()
+      throws IOException, InterruptedException {
+    Client client = setupRoomCreator("aaaa", "Dummy Room");
+    client.sendMessage(CMD_ROOM_CREATE_REQUEST, "99");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_STATE_CMD);
+    assertTrue(response.contains("Invalid command for in chat room state"));
+    client.close();
+  }
+
+  /**
+   * Tests that the server sends an appropriate error message when a client in the room attempts to
+   * list the rooms, which is an invalid action for the current state.
+   */
+  @Test
+  public void testServerErrorOnListRoomsWhileInARoom() throws IOException, InterruptedException {
+    Client client = setupRoomCreator("aaaa", "Dummy Room");
+    client.sendMessage(CMD_ROOM_JOIN_REQUEST, "99");
+    String response = client.getResponse(ERR_PROTOCOL_INVALID_STATE_CMD);
+    assertTrue(response.contains("Invalid command for in chat room state"));
+    client.close();
+  }
+
   public class Client {
 
     // Server Config
@@ -686,6 +774,7 @@ public class ChatServerTest {
      */
     public void sendMessage(char cmdType, String content) throws IOException {
       writer.write(cmdType + " " + content + "\r\n");
+
       writer.flush();
     }
 
@@ -699,7 +788,7 @@ public class ChatServerTest {
       }
     }
 
-    /** Closes the socket*/
+    /** Closes the socket */
     public void close() throws IOException, InterruptedException {
       if (socket != null && !socket.isClosed()) {
         socket.close();
