@@ -6,7 +6,7 @@ This is the server component of the Multi Thread Chat Application, handling mult
 
 - [Main Project Documentation](../README.md)
 - [Client Documentation](../client/README.md)
-- [Protocol documentation](./protocol.h)
+- [Protocol documentation](../protocol.md)
 
 ## Features
 
