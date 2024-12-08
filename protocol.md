@@ -73,7 +73,6 @@ This document describes the protocol used for communication between the client a
 
 
 ---
-#available-commands-for-each-client-state
 ## Available Commands For Each Client State
 
 | State                                                      | Available Commands                                                                |   
