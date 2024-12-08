@@ -58,6 +58,7 @@ make
 
 ### Client Architecture
 - Implemented in Ncurses
+- One thread for handling user input another for recieving server messages
 - Client functionality
   - Join or create chat rooms
   - Communicate with others in the room
