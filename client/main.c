@@ -41,7 +41,7 @@ CommandFormat commands[] = {
     {"/join", 0x05, 1, "\x05 %s\r\n"},    // CMD_ROOM_JOIN_REQUEST
     {"/exit", 0x01, 0, "\x01 dummy\r\n"}, // CMD_EXIT
     {"/msg", 0x07, 1, "\x07 %s\r\n"},     // CMD_MESSAGE_SEND 
-    {"/leave", 0x06, 0, "\x06 %s\r\n"},   // CMD_LEAVE_ROOM  
+    {"/leave", 0x06, 0, "\x06 dummy\r\n"},   // CMD_LEAVE_ROOM  
     {"/list", 0x04, 0, "\x04 dummy\r\n"}  // CMD_ROOM_LIST_REQUEST
 };
 
