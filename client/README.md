@@ -3,12 +3,14 @@
 This document outlines the test cases implemented for the Chat Client application. The tests were
 implemented using integration testing by ensuring the client could connect to the server, and once connected attempting various scenarios to ensure the client performs as expected. 
 
-
 ## Related Documentation
 - [Server Documentation](../server/README.md)
 - [Main Project Documentation](../README.md)
 - [Protocol documentation](../protocol.md)
 
+## Prerequisites
+* Running the client on Visual Studio Code will have a much cleaner look for the user interface.
+  
 ## To run
 * Start server by typing ./server
 * After the server starts, on a new terminal start the client by running make and then resizing the terminal to the full size of the screen then continue by typing ./client <server_ip> <port_number>(ex: ./client localhost 30000)
