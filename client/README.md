@@ -9,20 +9,17 @@ implemented using integration testing by ensuring the client could connect to th
 - [Main Project Documentation](../README.md)
 - [Protocol documentation](../protocol.md)
 
-
-## Prerequisites
-* Makefile and peripherals
-
 ## To run
 * Start server by typing ./server
 * After the server starts, on a new terminal start the client by running make and then resizing the terminal to the full size of the screen then continue by typing ./client <server_ip> <port_number>(ex: ./client localhost 30000)
 **example**
 ```bash
+*example*
 
 cd client
 make clean
 make
-./client 10.65.255.63 30000  #Run this if you already compiled it are in the directory
+./client 10.65.255.63 30000  #Run this with your local ip if you already compiled it are in the directory
 ```
 * Optionally if you wish to test the chatroom messages between users, start a new terminal and execute the client again, create a chatroom using /create <name> then join on the other client using /join <room#(eg.0)> 
 
