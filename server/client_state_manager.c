@@ -109,7 +109,7 @@ void send_message_to_client(const int client_fd, const char cmd_type, const char
         if (bytes == -1) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 LOG_CLIENT_DISCONNECT("Failed to send message to client fd %d: %s. Message: %s\n", client_fd,
-                                 strerror(errno), message);
+                                      strerror(errno), message);
                 break;
             }
             LOG_INFO("Send would block or socket is full for client fd %d, retrying\n", client_fd);
@@ -271,7 +271,9 @@ static void handle_awaiting_username(Client *client) {
     size_t username_length = strlen(&client->current_msg[2]);
     if (username_length > MAX_USERNAME_LEN) {
         LOG_USER_ERROR("Username too long from client fd %d: %zu characters\n", client->client_fd, username_length);
-        send_message_to_client(client->client_fd, ERR_USERNAME_LENGTH, "\033[32m" "User name too long, must be less than 32\n");
+        send_message_to_client(client->client_fd, ERR_USERNAME_LENGTH,
+                               "\033[32m"
+                               "User name too long, must be less than 32\n");
         return;
     }
 

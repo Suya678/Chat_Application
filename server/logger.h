@@ -19,7 +19,8 @@ void print_erro_n_exit(char *msg);
 #define LOG_SERVER_ERROR(format, ...) log_message(ANSI_BOLD ANSI_RED "SERVER ERROR: " format ANSI_RESET, ##__VA_ARGS__)
 #define LOG_INFO(format, ...) log_message(ANSI_BOLD ANSI_GREEN "INFO: " format ANSI_RESET, ##__VA_ARGS__)
 #define LOG_USER_ERROR(format, ...) log_message(ANSI_BOLD ANSI_YELLOW "USER ERROR: " format ANSI_RESET, ##__VA_ARGS__)
-#define LOG_CLIENT_DISCONNECT(format, ...) log_message(ANSI_BOLD ANSI_CYAN "CLIENT DISCONNECTED: " format ANSI_RESET, ##__VA_ARGS__)
+#define LOG_CLIENT_DISCONNECT(format, ...)                                                                             \
+    log_message(ANSI_BOLD ANSI_CYAN "CLIENT DISCONNECTED: " format ANSI_RESET, ##__VA_ARGS__)
 #else
 #define LOG_SERVER_ERROR(format, ...) ((void)0)
 #define LOG_INFO(format, ...) ((void)0)

@@ -10,7 +10,7 @@
 #define MAX_THREADS 4
 #define MAX_CLIENTS_PER_THREAD 1500 // How many client does each thread handles
 
-#define MAX_CLIENTS_ROOM 120                        // Max clients per room
+#define MAX_CLIENTS_ROOM 120                       // Max clients per room
 #define MAX_ROOMS 50                               // Max rooms
 #define MAX_CLIENTS (MAX_CLIENTS_ROOM * MAX_ROOMS) // Total possible clients
 

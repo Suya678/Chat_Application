@@ -3,11 +3,11 @@
 #include "client_state_manager.h" // For send_message_to_client()
 #include "logger.h"               // Has the logging function for LOG_INFO, LOG_SERVER_ERROR, LOG_WARNING
 // Library
-#include <pthread.h>    // For pthread_create
-#include <stdint.h>     // For uint64_t
-#include <unistd.h>     // For write, close
-#include "string.h"    // For strerror
-#include "errno.h"     // For errno
+#include "errno.h"   // For errno
+#include "string.h"  // For strerror
+#include <pthread.h> // For pthread_create
+#include <stdint.h>  // For uint64_t
+#include <unistd.h>  // For write, close
 
 static int find_worker_not_at_capacity(Worker_Thread workers[]);
 
