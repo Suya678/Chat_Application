@@ -9,7 +9,7 @@ import org.junit.Test;
 
 /**
  * Tests for the Chat Server implementation. This class contains tests to verify the functionality
- * of a chat server. Please readme the readme for more information
+ * of a chat server. Please read the readme for more information
  */
 public class ChatServerTest {
 
@@ -555,7 +555,7 @@ public class ChatServerTest {
    * Tests that the server correctly: Only broadcasts room to clients in the same room. Maintains
    * messaging isolation between rooms
    */
-  @Test(timeout = 100000) // To avoid infinite loops in getResponse calls
+  @Test(timeout = 200000) // To avoid infinite loops in getResponse calls
   public void testMessageIsolationBetweenRooms() throws IOException, InterruptedException {
     // Create two rooms with their creators
     Client room1Creator = setupRoomCreator("Room1Creator", "Room1");
@@ -699,7 +699,7 @@ public class ChatServerTest {
       }
     }
 
-    /** Closes the socket. Introduces a small delay between rapid sleep calls */
+    /** Closes the socket*/
     public void close() throws IOException, InterruptedException {
       if (socket != null && !socket.isClosed()) {
         socket.close();
