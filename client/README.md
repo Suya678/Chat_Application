@@ -20,8 +20,9 @@ implemented using integration testing by ensuring the client could connect to th
 
 ## To keep in mind
 
-* Two or more clients running on the same monitor window cause issues with the output displayed 
-* Any resizing of the windows once execution has began will definitely cause issues and potential crashes. 
+* Two or more clients running on the same monitor window cause issues with the output displayed. 
+* Any resizing of the windows once execution has began will definitely cause issues and potential crashes.
+* Any use of the scroll wheel on the mouse will not work.
 
 ## Server Configuration
 * Maximum Rooms: 50
