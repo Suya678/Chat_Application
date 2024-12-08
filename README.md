@@ -47,7 +47,7 @@ chat-application/
 ├── protocol.md      # Defines the simple protocol that the server and client uses to communicate
 ```
 
-## Quick start
+## To Start
 1. Start the server:
 ```bash
 cd server
@@ -63,4 +63,3 @@ make clean
 make
 ./client
 ```
- **Please the read the client readme for how to interact in the program**
