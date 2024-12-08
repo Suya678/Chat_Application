@@ -504,9 +504,9 @@ public class ChatServerTest {
   public void testRoomPersistsAfterUserLeaves() throws IOException, InterruptedException {
     List<Client> clients = new ArrayList<>();
     clients.add(setupClientWithUsername("roomCreator"));
-    clients.getFirst().getResponse(CMD_ROOM_LIST_RESPONSE);
-    clients.getFirst().sendMessage(CMD_ROOM_CREATE_REQUEST, "Dummy Room");
-    String response = clients.getFirst().getResponse(CMD_ROOM_CREATE_OK);
+    clients.get(0).getResponse(CMD_ROOM_LIST_RESPONSE);
+    clients.get(0).sendMessage(CMD_ROOM_CREATE_REQUEST, "Dummy Room");
+    String response = clients.get(0).getResponse(CMD_ROOM_CREATE_OK);
     assertTrue(response.contains("Room created successfully"));
 
     for (int i = 1; i < MAX_CLIENTS_PER_ROOM; i++) {
@@ -516,12 +516,12 @@ public class ChatServerTest {
       assertTrue(response.contains("joined"));
     }
 
-    clients.getFirst().sendMessage(CMD_LEAVE_ROOM, "dummy");
-    response = clients.getFirst().getResponse(CMD_ROOM_LEAVE_OK);
+    clients.get(0).sendMessage(CMD_LEAVE_ROOM, "dummy");
+    response = clients.get(0).getResponse(CMD_ROOM_LEAVE_OK);
     assertTrue(response.contains("left"));
 
-    clients.getFirst().sendMessage(CMD_ROOM_LIST_REQUEST, "dummy");
-    response = clients.getFirst().getResponse(CMD_ROOM_LIST_RESPONSE);
+    clients.get(0).sendMessage(CMD_ROOM_LIST_REQUEST, "dummy");
+    response = clients.get(0).getResponse(CMD_ROOM_LIST_RESPONSE);
     assertTrue(response.contains("Dummy Room"));
 
     disconnectClients(clients);

@@ -7,8 +7,8 @@
 #include "semaphore.h"
 #include "stdbool.h"
 // MAX Worker THREADS NEEDED
-#define MAX_THREADS 2
-#define MAX_CLIENTS_PER_THREAD 3000 // How many client does each thread handles
+#define MAX_THREADS 4
+#define MAX_CLIENTS_PER_THREAD 1500 // How many client does each thread handles
 
 #define MAX_CLIENTS_ROOM 120                        // Max clients per room
 #define MAX_ROOMS 50                               // Max rooms

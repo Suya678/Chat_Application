@@ -40,7 +40,9 @@
 #define MAX_USERNAME_LEN 32
 #define MAX_ROOM_NAME_LEN 24
 #define MAX_MESSAGE_LEN_TO_SERVER 132
-#define MAX_MESSAGE_LEN_FROM_SERVER 2700
+// Maximum message length from server is calculated to
+// accommodate a list of all room names plus some space for formatting
+#define MAX_MESSAGE_LEN_FROM_SERVER (MAX_ROOM_NAME_LEN * MAX_ROOMS + 256) 
 #define MAX_CONTENT_LEN 128
 
 #define MSG_TERMINATOR "\r\n"
