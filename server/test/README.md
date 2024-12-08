@@ -13,8 +13,7 @@ This document outlines the test cases implemented for the Chat Server applicatio
 * Network :  Both the server and the client were connected over localhost
 
 ## Prerequisites
-* Makefile and Java compiler. Comes with the Junit Jar in th directory
-
+* Makefile and Java compiler. Comes with the Junit Jar needed
 ## To replicate
 1. Open up two terminals
 2. In the server terminal:
