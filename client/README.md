@@ -61,7 +61,7 @@ implemented using integration testing by ensuring the client could connect to th
 |-------------------------|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|---------------|
 | `testMessageSentToRoom` | Tests client sends chat message to server        | Message should display on other clients machines as well as your own                                                                     | ✓             |
 | `testCommandSentToRoom` | Tests that commands in chatroom do nothing       | Client should display appropriate message as some commands are accepted in chatroom but should not send the command you type to the room | ✓             |
-| `testChatSynchronicity` | Tests clients ability to prevent race conditions | Multiple messages should all arrive as well as not change any other client                                                               | X             |
+| `testChatSynchronicity` | Tests clients ability to prevent race conditions | Multiple messages should all arrive as well as not change any other client                                                               | X The display properly shows multiple messages but a message recieved changes another clients cursor to the message window            |
 
 
 
