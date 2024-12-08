@@ -1,8 +1,0 @@
-PROGRAM="./make"
-
-# Loop to run the program 3 times
-for i in {1..3}; do
-    echo "Run #$i:"
-    # Run the program and filter the desired output line
-    $PROGRAM | grep "JUnit Vintage finished after"
-done
