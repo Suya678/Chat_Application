@@ -19,7 +19,8 @@ server component handling multiple client connections and a client interface for
 - **Java JUnit Framework**: For testing the server.
 
 ## To Start
-Note: This application requires running multiple terminal instances
+**Note: This application requires running multiple terminal instances**
+**Note: When running the server, please change the linux's default file descriptor limit as it will cause test cases to fail, type: ulimit -n 99999**
 1. Open two terminals
 2. In one terminal start the server:
 ```bash
